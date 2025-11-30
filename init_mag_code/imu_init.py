@@ -2,21 +2,13 @@ import serial
 import time
 import math
 import numpy as np
-from array import array
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
 ser_baudrate = 115200 # 串Port baud rate
-
 ser_timeout = 2 # Serial port operation timeout time
-# Open the serial port
-ser = serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout)
-
-flag = 0
 
 def Cmd_RxUnpack(buf, DLen):
-    global flag
-
     scaleAccel       = 0.00478515625
     scaleQuat        = 0.000030517578125
     scaleAngle       = 0.0054931640625
@@ -26,6 +18,31 @@ def Cmd_RxUnpack(buf, DLen):
     scaleAirPressure = 0.0002384185791
     scaleHeight      = 0.0010728836
 
+    # Handle configuration acknowledgments
+    if buf[0] == 0x12:
+        print("Configuration set successfully.")
+        return
+
+    if buf[0] == 0x03:
+        print("Sensor woken up.")
+        return
+
+    if buf[0] == 0x19:
+        print("Proactive reporting enabled.")
+        return
+
+    if buf[0] == 0x32:
+        print("Magnetometer calibration started.")
+        return
+
+    if buf[0] == 0x04:
+        print("Magnetometer calibration saved!")
+        return
+
+    if buf[0] == 0x05:
+        print("Z-axis angle reset to zero.")
+        return
+
     #print("rev data:",buf)
     if buf[0] == 0x11:
         ctl = (buf[2] << 8) | buf[1]
@@ -33,14 +50,14 @@ def Cmd_RxUnpack(buf, DLen):
         print(" ms: ", ((buf[6]<<24) | (buf[5]<<16) | (buf[4]<<8) | (buf[3]<<0)))
 
         L =7 # Starting from the 7th byte, the remaining data is parsed according to the subscription identification tag.
-        if ((ctl & 0x0001) != 0):  
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+        if ((ctl & 0x0001) != 0):
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taX: %.3f"%tmpX); # Acceleration ax without gravity
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taY: %.3f"%tmpY); # Acceleration ay without gravity
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taZ: %.3f"%tmpZ); #Acceleration az without gravity
-                    
+
         if ((ctl & 0x0002) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\tAX: %.3f"%tmpX) # Acceleration AX with gravity
@@ -50,13 +67,13 @@ def Cmd_RxUnpack(buf, DLen):
             # print("\tAZ: %.3f"%tmpZ) # Acceleration AZ gravity
 
         if ((ctl & 0x0004) != 0):
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGX: %.3f"%tmpX) # Angular velocity GX
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGY: %.3f"%tmpY) # Angular velocity GY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGZ: %.3f"%tmpZ) # Angular velocity GZ
-        
+
         if ((ctl & 0x0008) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
             print("\tCX: %.3f"%tmpX); # Magnetic field data CX
@@ -64,23 +81,23 @@ def Cmd_RxUnpack(buf, DLen):
             print("\tCY: %.3f"%tmpY); # Magnetic field data CY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
             print("\tCZ: %.3f"%tmpZ); # Magnetic field data CZ
-            tmpAbs = math.sqrt(math.pow(tmpX,2) + math.pow(tmpY,2) + math.pow(tmpZ,2)); 
+            tmpAbs = math.sqrt(math.pow(tmpX,2) + math.pow(tmpY,2) + math.pow(tmpZ,2));
             print("\tCAbs: %.3f"%tmpAbs); # Absolute value of 3-axis composite
-        
+
         if ((ctl & 0x0010) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleTemperature; L += 2
             # print("\ttemperature: %.2f"%tmpX) # temperature
 
             tmpU32 = np.uint32(((np.uint32(buf[L+2]) << 16) | (np.uint32(buf[L+1]) << 8) | np.uint32(buf[L])))
             if ((tmpU32 & 0x800000) == 0x800000): # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
-                tmpU32 = (tmpU32 | 0xff000000)      
+                tmpU32 = (tmpU32 | 0xff000000)
             tmpY = np.int32(tmpU32) * scaleAirPressure; L += 3
             # print("\tairPressure: %.3f"%tmpY); # air pressure
 
             tmpU32 = np.uint32((np.uint32(buf[L+2]) << 16) | (np.uint32(buf[L+1]) << 8) | np.uint32(buf[L]))
             if ((tmpU32 & 0x800000) == 0x800000): # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
                 tmpU32 = (tmpU32 | 0xff000000)
-            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3 
+            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3
             # print("\theight: %.3f"%tmpZ); # high
 
         if ((ctl & 0x0020) != 0):
@@ -95,16 +112,13 @@ def Cmd_RxUnpack(buf, DLen):
 
         if ((ctl & 0x0040) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # print("\tangleX: %.3f"%tmpX); # Euler angles x 
+            # print("\tangleX: %.3f"%tmpX); # Euler angles x
             tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # print("\tangleY: %.3f"%tmpY); # Euler angles y 
+            # print("\tangleY: %.3f"%tmpY); # Euler angles y
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # print("\tangleZ: %.3f"%tmpZ); # Euler angles z
-            
-            # flag = 1
-
     else:
-        print("------data head not define")
+        print(f"Error! Command ID not defined: 0x{buf[0]:02X}.")
 
 CmdPacket_Begin = 0x49   # Start code
 CmdPacket_End = 0x4D     # end code
@@ -184,61 +198,70 @@ def Cmd_PackAndTx(pDat, DLen):
     ser.write(buf)
     return 0
 
+def handle_response():
+    while True:
+        data = ser.read(1)
+        if len(data) > 0:
+            if Cmd_GetPkt(data[0]) == 1:
+                break
 
-def read_data():
-    global flag
-    flag = 0
-    print("------------Start--------------")
+def main():
+    global ser
+    with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
+        print("=== Starting Magnetometer Calibration ===")
+        print("Rotate the sensor randomly in all directions for 10 seconds and cover as many orientations as possible for best results.")
+        print()
+        input("Press Enter to start...")
+        print("Rotate sensor now!")
 
-    # Parameter settings
-    isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
-    barometerFilter = 2
-    Cmd_ReportTag = 0x7F # Feature subscription tag
-    params = bytearray([0x00 for i in range(0,11)])
-    params[0] = 0x12
-    params[1] = 5       #Stationary state acceleration threshold
-    params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
-    params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-    params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);   
-    params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
-    params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
-    params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
-    params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
-    params[9] = Cmd_ReportTag&0xff
-    params[10] = (Cmd_ReportTag>>8)&0xff    
-    Cmd_PackAndTx(params, len(params)) # Send commands to sensors
-    time.sleep(0.2)
+        # Parameter settings
+        isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
+        barometerFilter = 2
+        Cmd_ReportTag = 0x7F # Feature subscription tag
+        params = bytearray([0x00 for i in range(0,11)])
+        params[0] = 0x12
+        params[1] = 5       #Stationary state acceleration threshold
+        params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
+        params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
+        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);
+        params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
+        params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
+        params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
+        params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
+        params[9] = Cmd_ReportTag&0xff
+        params[10] = (Cmd_ReportTag>>8)&0xff
+        Cmd_PackAndTx(params, len(params)) # Send commands to sensors
+        handle_response()
 
-    # 2.Wake up sensor
-    Cmd_PackAndTx([0x03], 1)
-    time.sleep(0.2)
+        # 2.Wake up sensor
+        Cmd_PackAndTx([0x03], 1)
+        handle_response()
 
-    # 3.Enable proactive reporting
-    Cmd_PackAndTx([0x19], 1)
+        # 3.Enable proactive reporting
+        Cmd_PackAndTx([0x19], 1)
+        handle_response()
 
-   # 4. Start magnetometer calibration
-    print("------------Start magnetometer calibration--------------")
-    Cmd_PackAndTx([0x32], 1)  
-   # Make the Z axis of the module perpendicular to the horizontal plane and balance the Z axis to the horizontal plane, and rotate it more than one turn on the horizontal plane (a few more turns will give better results).
-    print("------------Within 10 seconds, rotate the Z-axis of the module perpendicular to the horizontal plane and the Z-axis balanced on the horizontal plane and rotate more than once in the horizontal plane--------------")
-    time.sleep(10.0)
- 
-   # 5. Finish magnetometer calibration
-    print("------------Finish magnetometer calibration--------------")   
-    Cmd_PackAndTx([0x04], 1)  
+        # 4. Start magnetometer calibration
+        Cmd_PackAndTx([0x32], 1)
+        handle_response()
+        # Make the Z axis of the module perpendicular to the horizontal plane and balance the Z axis to the horizontal plane, and rotate it more than one turn on the horizontal plane (a few more turns will give better results).
+        for i in range(10, 0, -1):
+            print(f"\r{i} seconds remaining... ", end='', flush=True)
+            time.sleep(1)
 
-   # 6. Z axis angle reset to zero
-    print("------------Z axis angle reset to zero--------------")  
-    Cmd_PackAndTx([0x05], 1)  
-    time.sleep(0.5)
+        # 5. Finish magnetometer calibration
+        Cmd_PackAndTx([0x04], 1)
+        handle_response()
 
-    print("------------Read data once--------------")  
-    # Loop to receive data and process it
-    while not flag:
-        data = ser.read(1) # read 1 bytes
-        if len(data) > 0: # if data is not empty
-            Cmd_GetPkt(data[0])
+        # 6. Z axis angle reset to zero
+        Cmd_PackAndTx([0x05], 1)
+        handle_response()
 
-# Start reading data
-read_data()
-print("------------Finish--------------") 
+        # Read final data
+        Cmd_PackAndTx([0x11], 1)
+        handle_response()
+
+        print("Magnetometer Calibration Complete!")
+
+if __name__ == "__main__":
+    main()
