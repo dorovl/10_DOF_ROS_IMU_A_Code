@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- ttyUSB0 for USB serial port -->
+  <arg name="port_name" default="/dev/ttyUSB0" />
+  <!-- connect imu -->
+  <node name="imu_node" pkg="imu" type="imu_node" output="screen">
+      <param name="port_name" value="$(arg port_name)" />
+  </node>
+  <!-- rviz node -->
+  <node pkg="rviz"  type="rviz"  name="rviz"  args="-d $(find imu)/rviz/imu_view.rviz" />
+</launch>
