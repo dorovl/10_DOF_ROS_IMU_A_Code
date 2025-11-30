@@ -12,11 +12,7 @@ ser_timeout = 2 # Serial port operation timeout time
 # Open the serial port
 ser = serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout)
 
-flag = 0
-
 def Cmd_RxUnpack(buf, DLen):
-    global flag
-
     scaleAccel       = 0.00478515625
     scaleQuat        = 0.000030517578125
     scaleAngle       = 0.0054931640625
@@ -134,12 +130,11 @@ def Cmd_RxUnpack(buf, DLen):
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # print("\tangleZ: %.3f"%tmpZ); # Euler angles z
             
-        flag = 1
     elif buf[0] == 0x34:
         print("\taccelRange: %.3f"%buf[1]); # accelRange 
         print("\tgyroRange: %.3f"%buf[2]); # gyroRange 
     else:
-        print("------data head not defined: 0x%02X"%buf[0])
+        print("------command ID not defined: 0x%02X"%buf[0])
 
 CmdPacket_Begin = 0x49   # Start code
 CmdPacket_End = 0x4D     # end code
@@ -219,11 +214,17 @@ def Cmd_PackAndTx(pDat, DLen):
     ser.write(buf)
     return 0
 
+def handle_response():
+    while True:
+        data = ser.read(1)
+        if len(data) > 0:
+            if Cmd_GetPkt(data[0]) == 1:
+                break
+
 def read_data():
-    global flag, faces_collected
-    flag = 0
-    faces_collected = 0  # Add this line
-    print("------------Start--------------")
+    global faces_collected
+    faces_collected = 0
+    print("Starting accelerometer calibration. Note: a pause during blinking means that the face has been collected.")
 
     # Parameter settings
     isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
@@ -242,89 +243,45 @@ def read_data():
     params[9] = Cmd_ReportTag&0xff
     params[10] = (Cmd_ReportTag>>8)&0xff    
     Cmd_PackAndTx(params, len(params)) # Send commands to sensors
-    time.sleep(0.2)
+    handle_response()
 
     # 2.Wake up sensor
     Cmd_PackAndTx([0x03], 1)
-    time.sleep(0.2)
+    handle_response()
 
     # 3.Disable proactive reporting
     Cmd_PackAndTx([0x18], 1)
-    time.sleep(0.2)
+    handle_response()
 
     # 4.Set the range of accelerometer and gyroscope
     # AccRange range 0=2g 1=4g 2=8g 3=16g
     # GyroRange range 0=256 1=512 2=1024 3=2048
     Cmd_PackAndTx([0x33,0x00,0x00], 3)
-    time.sleep(0.2)
+    handle_response()
 
-   # 5. Start accelerometer calibration
-    print("------------Start accelerometer calibration--------------")
-    Cmd_PackAndTx([0x17,0x00], 2) 
-    time.sleep(0.5)  # Give time for response
-    
-    # Read any immediate responses
-    print("Reading calibration start response...")
-    for _ in range(50):
+    # 5. Start accelerometer calibration process
+    Cmd_PackAndTx([0x17,0x00], 2)
+    while faces_collected < 6:
         data = ser.read(1)
         if len(data) > 0:
             Cmd_GetPkt(data[0])
     
-    print("------------Static automatic collection of data, the light does not turn on, it means that this surface is collected, the light will resume flashing, waiting for the next surface to be collected, to collect six faces in total.--------------")
-    
-    # Read calibration progress during collection
-    print("Monitoring calibration progress (will auto-exit after face 6)...")
-    faces_collected = 0
-    try:
-        while faces_collected < 6:
-            data = ser.read(1)
-            if len(data) > 0:
-                Cmd_GetPkt(data[0])
-    except KeyboardInterrupt:
-        print("\nCalibration monitoring stopped by user")
-    
-    #input("Press Enter to finish calibration...")
- 
-   # 6. Finish accelerometer calibration
-    print("------------Finishing accelerometer calibration--------------")   
-    Cmd_PackAndTx([0x17,0xff], 2) 
-    time.sleep(0.5)
-    
-    # Read finish calibration response
-    print("Reading calibration finish response...")
-    for _ in range(10):  # Reduced from 50
-        data = ser.read(1)
-        if len(data) > 0:
-            Cmd_GetPkt(data[0])
-        else:
-            break  # Exit immediately if no data
+    # 6. Committing accelerometer calibration
+    Cmd_PackAndTx([0x17,0xff], 2)
+    handle_response()
 
-    # 7.Read the range of accelerometer and gyroscope
+    # 7. Reading the range of accelerometer and gyroscope
     # AccRange range 0=2g 1=4g 2=8g 3=16g
     # GyroRange range 0=256 1=512 2=1024 3=2048
-    print("------------Readig the range of accelerometer and gyroscope--------------")  
-    Cmd_PackAndTx([0x34], 1)  
-    time.sleep(0.2)
+    Cmd_PackAndTx([0x34], 1)
+    handle_response()
 
     # 8. Read one time
-    print("------------Place sensor flat and still for final verification...--------------")
-    time.sleep(5)  # Give time to position sensor
+    print("Place sensor flat and still for final verification.")
+    time.sleep(10)
     Cmd_PackAndTx([0x11], 1) 
-    print("------------Waiting for sensor response (this may take a few seconds)...")
-    print("------------Note: Once calibration is complete, the gravitational acceleration modulus at final rest should be close to your local gravitational acceleratione--------------")
-
-    # Loop to receive data and process it
-    timeout_count = 0
-    max_empty_reads = 5  # Exit after 5 consecutive empty reads (10 seconds total)
-    while flag==0 and timeout_count < max_empty_reads:
-        data = ser.read(1)
-        if len(data) > 0:
-            Cmd_GetPkt(data[0])
-            timeout_count = 0  # Reset on data
-        else:
-            timeout_count += 1
-            print("Still waiting...")
+    handle_response()
+    print("The measured gravitational acceleration modulus at final rest should be close to your local gravitational acceleration.")
             
 # Start reading data
 read_data()
-print("------------Finish--------------")
