@@ -27,6 +27,10 @@ def Cmd_RxUnpack(buf, DLen):
         print("Sensor woken up.")
         return
 
+    if buf[0] == 0x18:
+        print("Proactive reporting disabled.")
+        return
+    
     if buf[0] == 0x19:
         print("Proactive reporting enabled.")
         return
@@ -209,7 +213,8 @@ def main():
     global ser
     with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
         print("=== Starting Magnetometer Calibration ===")
-        print("Rotate the sensor randomly in all directions for 10 seconds and cover as many orientations as possible for best results.")
+        print("Rotate the sensor randomly in all 3D directions to sample the complete magnetic field sphere.")
+        print("Flip, tilt, and rotate in every possible orientation for best calibration results.")
         print()
         input("Press Enter to start...")
         print("Rotate sensor now!")
@@ -237,15 +242,14 @@ def main():
         Cmd_PackAndTx([0x03], 1)
         handle_response()
 
-        # 3.Enable proactive reporting
-        Cmd_PackAndTx([0x19], 1)
+        # 3.Disable proactive reporting (keep it off during calibration)
+        Cmd_PackAndTx([0x18], 1)
         handle_response()
 
         # 4. Start magnetometer calibration
         Cmd_PackAndTx([0x32], 1)
         handle_response()
-        # Make the Z axis of the module perpendicular to the horizontal plane and balance the Z axis to the horizontal plane, and rotate it more than one turn on the horizontal plane (a few more turns will give better results).
-        for i in range(10, 0, -1):
+        for i in range(30, 0, -1):
             print(f"\r{i} seconds remaining... ", end='', flush=True)
             time.sleep(1)
 

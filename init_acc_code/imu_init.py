@@ -48,6 +48,10 @@ def Cmd_RxUnpack(buf, DLen):
     if buf[0] == 0x18:
         print("Proactive reporting disabled.")
         return
+    
+    if buf[0] == 0x19:
+        print("Proactive reporting enabled.")
+        return
 
     if buf[0] == 0x33:
         print("Range configuration set.")
