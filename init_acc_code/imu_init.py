@@ -237,7 +237,7 @@ def main():
         params[1] = 5       #Stationary state acceleration threshold
         params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
         params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);
+        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1)
         params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
         params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
         params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
