@@ -5,7 +5,7 @@ import numpy as np
 from array import array
 
 # Set the correct serial port parameters------------------------
-ser_port = "COM13"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
+ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
 ser_baudrate = 115200 # 串Port baud rate
 
 ser_timeout = 2 # Serial port operation timeout time
@@ -25,6 +25,37 @@ def Cmd_RxUnpack(buf, DLen):
     scaleTemperature = 0.01
     scaleAirPressure = 0.0002384185791
     scaleHeight      = 0.0010728836
+
+    # Handle calibration status messages
+    if buf[0] == 0x17:
+        global faces_collected  # Add this line
+        if DLen >= 2:
+            status = buf[1]
+            if status == 0xFF:
+                print("Calibration finished!")
+            elif status >= 0x01 and status <= 0x06:
+                print(f"Calibration progress: Face {status}/6 collected")
+                faces_collected = status  # Add this line
+            else:
+                print(f"Calibration status: 0x{status:02X}")
+        return
+    
+    # Handle configuration acknowledgments
+    if buf[0] == 0x12:
+        print("Configuration set successfully")
+        return
+    
+    if buf[0] == 0x03:
+        print("Sensor woken up")
+        return
+    
+    if buf[0] == 0x18:
+        print("Proactive reporting disabled")
+        return
+    
+    if buf[0] == 0x33:
+        print("Range configuration set")
+        return
 
     #print("rev data:",buf)
     if buf[0] == 0x11:
@@ -104,12 +135,11 @@ def Cmd_RxUnpack(buf, DLen):
             # print("\tangleZ: %.3f"%tmpZ); # Euler angles z
             
         flag = 1
-    if buf[0] == 0x34:
+    elif buf[0] == 0x34:
         print("\taccelRange: %.3f"%buf[1]); # accelRange 
         print("\tgyroRange: %.3f"%buf[2]); # gyroRange 
-    
     else:
-        print("------data head not define")
+        print("------data head not defined: 0x%02X"%buf[0])
 
 CmdPacket_Begin = 0x49   # Start code
 CmdPacket_End = 0x4D     # end code
@@ -190,8 +220,9 @@ def Cmd_PackAndTx(pDat, DLen):
     return 0
 
 def read_data():
-    global flag
+    global flag, faces_collected
     flag = 0
+    faces_collected = 0  # Add this line
     print("------------Start--------------")
 
     # Parameter settings
@@ -219,38 +250,81 @@ def read_data():
 
     # 3.Disable proactive reporting
     Cmd_PackAndTx([0x18], 1)
+    time.sleep(0.2)
 
     # 4.Set the range of accelerometer and gyroscope
     # AccRange range 0=2g 1=4g 2=8g 3=16g
     # GyroRange range 0=256 1=512 2=1024 3=2048
     Cmd_PackAndTx([0x33,0x00,0x00], 3)
+    time.sleep(0.2)
 
    # 5. Start accelerometer calibration
     print("------------Start accelerometer calibration--------------")
     Cmd_PackAndTx([0x17,0x00], 2) 
-   # Static automatic collection of data, the light does not turn on, it means that this surface is collected, the light will resume flashing, waiting for the next surface to be collected, to collect six faces in total..
+    time.sleep(0.5)  # Give time for response
+    
+    # Read any immediate responses
+    print("Reading calibration start response...")
+    for _ in range(50):
+        data = ser.read(1)
+        if len(data) > 0:
+            Cmd_GetPkt(data[0])
+    
     print("------------Static automatic collection of data, the light does not turn on, it means that this surface is collected, the light will resume flashing, waiting for the next surface to be collected, to collect six faces in total.--------------")
-    input("Press Enter to continue...")
+    
+    # Read calibration progress during collection
+    print("Monitoring calibration progress (will auto-exit after face 6)...")
+    faces_collected = 0
+    try:
+        while faces_collected < 6:
+            data = ser.read(1)
+            if len(data) > 0:
+                Cmd_GetPkt(data[0])
+    except KeyboardInterrupt:
+        print("\nCalibration monitoring stopped by user")
+    
+    #input("Press Enter to finish calibration...")
  
    # 6. Finish accelerometer calibration
-    print("------------Finish accelerometer calibration--------------")   
+    print("------------Finishing accelerometer calibration--------------")   
     Cmd_PackAndTx([0x17,0xff], 2) 
+    time.sleep(0.5)
+    
+    # Read finish calibration response
+    print("Reading calibration finish response...")
+    for _ in range(10):  # Reduced from 50
+        data = ser.read(1)
+        if len(data) > 0:
+            Cmd_GetPkt(data[0])
+        else:
+            break  # Exit immediately if no data
 
-   # 7.Read the range of accelerometer and gyroscope
+    # 7.Read the range of accelerometer and gyroscope
     # AccRange range 0=2g 1=4g 2=8g 3=16g
     # GyroRange range 0=256 1=512 2=1024 3=2048
-    print("------------Read the range of accelerometer and gyroscope--------------")  
+    print("------------Readig the range of accelerometer and gyroscope--------------")  
     Cmd_PackAndTx([0x34], 1)  
+    time.sleep(0.2)
 
-   # 8. Read one time
+    # 8. Read one time
+    print("------------Place sensor flat and still for final verification...--------------")
+    time.sleep(5)  # Give time to position sensor
     Cmd_PackAndTx([0x11], 1) 
-    print("------------Once calibration is complete, the gravitational acceleration modulus at final rest should be close to your local gravitational acceleratione--------------")  
+    print("------------Waiting for sensor response (this may take a few seconds)...")
+    print("------------Note: Once calibration is complete, the gravitational acceleration modulus at final rest should be close to your local gravitational acceleratione--------------")
 
     # Loop to receive data and process it
-    while flag==0:
-        data = ser.read(1) # read 1 bytes
-        if len(data) > 0: # if data is not empty
+    timeout_count = 0
+    max_empty_reads = 5  # Exit after 5 consecutive empty reads (10 seconds total)
+    while flag==0 and timeout_count < max_empty_reads:
+        data = ser.read(1)
+        if len(data) > 0:
             Cmd_GetPkt(data[0])
+            timeout_count = 0  # Reset on data
+        else:
+            timeout_count += 1
+            print("Still waiting...")
+            
 # Start reading data
 read_data()
-print("------------Finish--------------") 
+print("------------Finish--------------")
