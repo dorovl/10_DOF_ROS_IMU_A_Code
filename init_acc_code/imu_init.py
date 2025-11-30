@@ -28,7 +28,7 @@ def Cmd_RxUnpack(buf, DLen):
         if DLen >= 2:
             status = buf[1]
             if status == 0xFF:
-                print("Calibration finished!")
+                print("Calibration saved!")
             elif status >= 0x01 and status <= 0x06:      
                 faces_collected = status
                 if faces_collected != 6:
@@ -36,24 +36,24 @@ def Cmd_RxUnpack(buf, DLen):
                 else:
                     print(f"Calibration progress: Face {faces_collected}/6 collected.")
             else:
-                print(f"Calibration status: 0x{status:02X}")
+                print(f"Calibration status: 0x{status:02X}.")
         return
     
     # Handle configuration acknowledgments
     if buf[0] == 0x12:
-        print("Configuration set successfully")
+        print("Configuration set successfully.")
         return
     
     if buf[0] == 0x03:
-        print("Sensor woken up")
+        print("Sensor woken up.")
         return
     
     if buf[0] == 0x18:
-        print("Proactive reporting disabled")
+        print("Proactive reporting disabled.")
         return
     
     if buf[0] == 0x33:
-        print("Range configuration set")
+        print("Range configuration set.")
         return
 
     #print("rev data:",buf)
@@ -137,7 +137,7 @@ def Cmd_RxUnpack(buf, DLen):
         print("\taccelRange: %.3f"%buf[1]); # accelRange 
         print("\tgyroRange: %.3f"%buf[2]); # gyroRange 
     else:
-        print("------command ID not defined: 0x%02X"%buf[0])
+        print(f"Error! Command ID not defined: 0x{buf[0]:02X}.")
 
 CmdPacket_Begin = 0x49   # Start code
 CmdPacket_End = 0x4D     # end code
@@ -270,7 +270,7 @@ def read_data():
         if len(data) > 0:
             Cmd_GetPkt(data[0])
     
-    # 6. Committing accelerometer calibration
+    # 6. Saving accelerometer calibration
     Cmd_PackAndTx([0x17,0xff], 2)
     handle_response()
 
@@ -288,7 +288,7 @@ def read_data():
     print("\rTaking measurement...                       ", flush=True)
     Cmd_PackAndTx([0x11], 1) 
     handle_response()
-    print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s²")
+    print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s².")
             
 # Start reading data
 read_data()
