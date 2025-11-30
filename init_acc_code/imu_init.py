@@ -26,7 +26,7 @@ def Cmd_RxUnpack(buf, DLen):
             status = buf[1]
             if status == 0xFF:
                 print("Calibration saved!")
-            elif status >= 0x01 and status <= 0x06:      
+            elif status >= 0x01 and status <= 0x06:
                 faces_collected = status
                 if faces_collected != 6:
                     print(f"Calibration progress: Face {faces_collected}/6 collected. Change the face please!")
@@ -35,20 +35,20 @@ def Cmd_RxUnpack(buf, DLen):
             else:
                 print(f"Calibration status: 0x{status:02X}.")
         return
-    
+
     # Handle configuration acknowledgments
     if buf[0] == 0x12:
         print("Configuration set successfully.")
         return
-    
+
     if buf[0] == 0x03:
         print("Sensor woken up.")
         return
-    
+
     if buf[0] == 0x18:
         print("Proactive reporting disabled.")
         return
-    
+
     if buf[0] == 0x33:
         print("Range configuration set.")
         return
@@ -60,14 +60,14 @@ def Cmd_RxUnpack(buf, DLen):
         print(" ms: ", ((buf[6]<<24) | (buf[5]<<16) | (buf[4]<<8) | (buf[3]<<0)))
 
         L =7 # Starting from the 7th byte, the remaining data is parsed according to the subscription identification tag.
-        if ((ctl & 0x0001) != 0):  
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+        if ((ctl & 0x0001) != 0):
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taX: %.3f"%tmpX); # Acceleration ax without gravity
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taY: %.3f"%tmpY); # Acceleration ay without gravity
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\taZ: %.3f"%tmpZ); #Acceleration az without gravity
-                    
+
         if ((ctl & 0x0002) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\tAX: %.3f"%tmpX) # Acceleration AX with gravity
@@ -79,13 +79,13 @@ def Cmd_RxUnpack(buf, DLen):
             print("\tAbs: %.3f"%tmpAbs) # Acceleration module
 
         if ((ctl & 0x0004) != 0):
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGX: %.3f"%tmpX) # Angular velocity GX
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGY: %.3f"%tmpY) # Angular velocity GY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # print("\tGZ: %.3f"%tmpZ) # Angular velocity GZ
-        
+
         if ((ctl & 0x0008) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
             print("\tCX: %.3f"%tmpX); # Magnetic field data CX
@@ -93,23 +93,23 @@ def Cmd_RxUnpack(buf, DLen):
             print("\tCY: %.3f"%tmpY); # Magnetic field data CY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
             print("\tCZ: %.3f"%tmpZ); # Magnetic field data CZ
-            tmpAbs = math.sqrt(math.pow(tmpX,2) + math.pow(tmpY,2) + math.pow(tmpZ,2)); 
+            tmpAbs = math.sqrt(math.pow(tmpX,2) + math.pow(tmpY,2) + math.pow(tmpZ,2));
             print("\tCAbs: %.3f"%tmpAbs); # Absolute value of 3-axis composite
-        
+
         if ((ctl & 0x0010) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleTemperature; L += 2
             # print("\ttemperature: %.2f"%tmpX) # temperature
 
             tmpU32 = np.uint32(((np.uint32(buf[L+2]) << 16) | (np.uint32(buf[L+1]) << 8) | np.uint32(buf[L])))
             if ((tmpU32 & 0x800000) == 0x800000): # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
-                tmpU32 = (tmpU32 | 0xff000000)      
+                tmpU32 = (tmpU32 | 0xff000000)
             tmpY = np.int32(tmpU32) * scaleAirPressure; L += 3
             # print("\tairPressure: %.3f"%tmpY); # air pressure
 
             tmpU32 = np.uint32((np.uint32(buf[L+2]) << 16) | (np.uint32(buf[L+1]) << 8) | np.uint32(buf[L]))
             if ((tmpU32 & 0x800000) == 0x800000): # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
                 tmpU32 = (tmpU32 | 0xff000000)
-            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3 
+            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3
             # print("\theight: %.3f"%tmpZ); # high
 
         if ((ctl & 0x0020) != 0):
@@ -124,15 +124,15 @@ def Cmd_RxUnpack(buf, DLen):
 
         if ((ctl & 0x0040) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # print("\tangleX: %.3f"%tmpX); # Euler angles x 
+            # print("\tangleX: %.3f"%tmpX); # Euler angles x
             tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # print("\tangleY: %.3f"%tmpY); # Euler angles y 
+            # print("\tangleY: %.3f"%tmpY); # Euler angles y
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # print("\tangleZ: %.3f"%tmpZ); # Euler angles z
-            
+
     elif buf[0] == 0x34:
-        print("\taccelRange: %.3f"%buf[1]); # accelRange 
-        print("\tgyroRange: %.3f"%buf[2]); # gyroRange 
+        print("\taccelRange: %.3f"%buf[1]); # accelRange
+        print("\tgyroRange: %.3f"%buf[2]); # gyroRange
     else:
         print(f"Error! Command ID not defined: 0x{buf[0]:02X}.")
 
@@ -237,13 +237,13 @@ def main():
         params[1] = 5       #Stationary state acceleration threshold
         params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
         params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);   
+        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);
         params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
         params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
         params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
         params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
         params[9] = Cmd_ReportTag&0xff
-        params[10] = (Cmd_ReportTag>>8)&0xff    
+        params[10] = (Cmd_ReportTag>>8)&0xff
         Cmd_PackAndTx(params, len(params)) # Send commands to sensors
         handle_response()
 
@@ -267,7 +267,7 @@ def main():
             data = ser.read(1)
             if len(data) > 0:
                 Cmd_GetPkt(data[0])
-        
+
         # 6. Saving accelerometer calibration
         Cmd_PackAndTx([0x17,0xff], 2)
         handle_response()
@@ -284,7 +284,7 @@ def main():
             print(f"\rStarting verification in {i} seconds... ", end='', flush=True)
             time.sleep(1)
         print("\rTaking measurement...                       ", flush=True)
-        Cmd_PackAndTx([0x11], 1) 
+        Cmd_PackAndTx([0x11], 1)
         handle_response()
         print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s².")
 
