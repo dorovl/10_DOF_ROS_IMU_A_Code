@@ -24,14 +24,17 @@ def Cmd_RxUnpack(buf, DLen):
 
     # Handle calibration status messages
     if buf[0] == 0x17:
-        global faces_collected  # Add this line
+        global faces_collected
         if DLen >= 2:
             status = buf[1]
             if status == 0xFF:
                 print("Calibration finished!")
-            elif status >= 0x01 and status <= 0x06:
-                print(f"Calibration progress: Face {status}/6 collected")
-                faces_collected = status  # Add this line
+            elif status >= 0x01 and status <= 0x06:      
+                faces_collected = status
+                if faces_collected != 6:
+                    print(f"Calibration progress: Face {faces_collected}/6 collected. Change the face please!")
+                else:
+                    print(f"Calibration progress: Face {faces_collected}/6 collected.")
             else:
                 print(f"Calibration status: 0x{status:02X}")
         return
@@ -224,8 +227,9 @@ def handle_response():
 def read_data():
     global faces_collected
     faces_collected = 0
-    print("Starting accelerometer calibration. Note: a pause during blinking means that the face has been collected.")
-
+    print("=== Starting Accelerometer Calibration ===")
+    print("Place the sensor on first face and keep it still. Once prompted for, change the face.")
+    print("Note: The LED will pause briefly when each face is collected.")
     # Parameter settings
     isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
     barometerFilter = 2
@@ -277,11 +281,14 @@ def read_data():
     handle_response()
 
     # 8. Read one time
-    print("Place sensor flat and still for final verification.")
-    time.sleep(10)
+    print("Place sensor flat and keep it completely still...")
+    for i in range(10, 0, -1):
+        print(f"\rStarting verification in {i} seconds... ", end='', flush=True)
+        time.sleep(1)
+    print("\rTaking measurement...                       ", flush=True)
     Cmd_PackAndTx([0x11], 1) 
     handle_response()
-    print("The measured gravitational acceleration modulus at final rest should be close to your local gravitational acceleration.")
+    print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s²")
             
 # Start reading data
 read_data()
