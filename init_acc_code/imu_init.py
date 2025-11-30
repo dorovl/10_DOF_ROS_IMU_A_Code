@@ -2,15 +2,12 @@ import serial
 import time
 import math
 import numpy as np
-from array import array
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
 ser_baudrate = 115200 # 串Port baud rate
 
 ser_timeout = 2 # Serial port operation timeout time
-# Open the serial port
-ser = serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout)
 
 def Cmd_RxUnpack(buf, DLen):
     scaleAccel       = 0.00478515625
@@ -224,71 +221,72 @@ def handle_response():
             if Cmd_GetPkt(data[0]) == 1:
                 break
 
-def read_data():
-    global faces_collected
+def main():
+    global ser, faces_collected
     faces_collected = 0
-    print("=== Starting Accelerometer Calibration ===")
-    print("Place the sensor on first face and keep it still. Once prompted for, change the face.")
-    print("Note: The LED will pause briefly when each face is collected.")
-    # Parameter settings
-    isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
-    barometerFilter = 2
-    Cmd_ReportTag = 0x02 # Feature subscription tag
-    params = bytearray([0x00 for i in range(0,11)])
-    params[0] = 0x12
-    params[1] = 5       #Stationary state acceleration threshold
-    params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
-    params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-    params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);   
-    params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
-    params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
-    params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
-    params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
-    params[9] = Cmd_ReportTag&0xff
-    params[10] = (Cmd_ReportTag>>8)&0xff    
-    Cmd_PackAndTx(params, len(params)) # Send commands to sensors
-    handle_response()
+    with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
+        print("=== Starting Accelerometer Calibration ===")
+        print("Place the sensor on first face and keep it still. Once prompted for, change the face.")
+        print("Note: The LED will pause briefly when each face is collected.")
+        # Parameter settings
+        isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
+        barometerFilter = 2
+        Cmd_ReportTag = 0x02 # Feature subscription tag
+        params = bytearray([0x00 for i in range(0,11)])
+        params[0] = 0x12
+        params[1] = 5       #Stationary state acceleration threshold
+        params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
+        params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
+        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);   
+        params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
+        params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
+        params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
+        params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
+        params[9] = Cmd_ReportTag&0xff
+        params[10] = (Cmd_ReportTag>>8)&0xff    
+        Cmd_PackAndTx(params, len(params)) # Send commands to sensors
+        handle_response()
 
-    # 2.Wake up sensor
-    Cmd_PackAndTx([0x03], 1)
-    handle_response()
+        # 2.Wake up sensor
+        Cmd_PackAndTx([0x03], 1)
+        handle_response()
 
-    # 3.Disable proactive reporting
-    Cmd_PackAndTx([0x18], 1)
-    handle_response()
+        # 3.Disable proactive reporting
+        Cmd_PackAndTx([0x18], 1)
+        handle_response()
 
-    # 4.Set the range of accelerometer and gyroscope
-    # AccRange range 0=2g 1=4g 2=8g 3=16g
-    # GyroRange range 0=256 1=512 2=1024 3=2048
-    Cmd_PackAndTx([0x33,0x00,0x00], 3)
-    handle_response()
+        # 4.Set the range of accelerometer and gyroscope
+        # AccRange range 0=2g 1=4g 2=8g 3=16g
+        # GyroRange range 0=256 1=512 2=1024 3=2048
+        Cmd_PackAndTx([0x33,0x00,0x00], 3)
+        handle_response()
 
-    # 5. Start accelerometer calibration process
-    Cmd_PackAndTx([0x17,0x00], 2)
-    while faces_collected < 6:
-        data = ser.read(1)
-        if len(data) > 0:
-            Cmd_GetPkt(data[0])
-    
-    # 6. Saving accelerometer calibration
-    Cmd_PackAndTx([0x17,0xff], 2)
-    handle_response()
+        # 5. Start accelerometer calibration process
+        Cmd_PackAndTx([0x17,0x00], 2)
+        while faces_collected < 6:
+            data = ser.read(1)
+            if len(data) > 0:
+                Cmd_GetPkt(data[0])
+        
+        # 6. Saving accelerometer calibration
+        Cmd_PackAndTx([0x17,0xff], 2)
+        handle_response()
 
-    # 7. Reading the range of accelerometer and gyroscope
-    # AccRange range 0=2g 1=4g 2=8g 3=16g
-    # GyroRange range 0=256 1=512 2=1024 3=2048
-    Cmd_PackAndTx([0x34], 1)
-    handle_response()
+        # 7. Reading the range of accelerometer and gyroscope
+        # AccRange range 0=2g 1=4g 2=8g 3=16g
+        # GyroRange range 0=256 1=512 2=1024 3=2048
+        Cmd_PackAndTx([0x34], 1)
+        handle_response()
 
-    # 8. Read one time
-    print("Place sensor flat and keep it completely still...")
-    for i in range(10, 0, -1):
-        print(f"\rStarting verification in {i} seconds... ", end='', flush=True)
-        time.sleep(1)
-    print("\rTaking measurement...                       ", flush=True)
-    Cmd_PackAndTx([0x11], 1) 
-    handle_response()
-    print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s².")
-            
-# Start reading data
-read_data()
+        # 8. Read one time
+        print("Place sensor flat and keep it completely still...")
+        for i in range(10, 0, -1):
+            print(f"\rStarting verification in {i} seconds... ", end='', flush=True)
+            time.sleep(1)
+        print("\rTaking measurement...                       ", flush=True)
+        Cmd_PackAndTx([0x11], 1) 
+        handle_response()
+        print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s².")
+
+if __name__ == "__main__":
+    main()
