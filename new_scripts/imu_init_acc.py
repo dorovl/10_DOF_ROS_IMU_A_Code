@@ -2,7 +2,7 @@ import serial
 import time
 
 # Import the reusable IMU parser library
-from imu_parser import Cmd_GetPkt, Cmd_PackAndTx
+from imu_parser import Cmd_GetPkt, Cmd_PackAndTx, handle_response
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
@@ -83,14 +83,6 @@ imu_callbacks = {
     'unknown_command': on_unknown_command,
 }
 
-def handle_response(ser):
-    """Wait for and process a complete response packet"""
-    while True:
-        data = ser.read(1)
-        if len(data) > 0:
-            if Cmd_GetPkt(data[0], callbacks=imu_callbacks) == 1:
-                break
-
 def main():
     """Main accelerometer calibration function"""
     global faces_collected
@@ -118,21 +110,21 @@ def main():
         params[9] = Cmd_ReportTag&0xff
         params[10] = (Cmd_ReportTag>>8)&0xff
         Cmd_PackAndTx(params, len(params), ser.write) # Send commands to sensors
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 2.Wake up sensor
         Cmd_PackAndTx([0x03], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 3.Disable proactive reporting
         Cmd_PackAndTx([0x18], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 4.Set the range of accelerometer and gyroscope
         # AccRange range 0=2g 1=4g 2=8g 3=16g
         # GyroRange range 0=256 1=512 2=1024 3=2048
         Cmd_PackAndTx([0x33,0x00,0x00], 3, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 5. Start accelerometer calibration process
         Cmd_PackAndTx([0x17,0x00], 2, ser.write)
@@ -143,13 +135,13 @@ def main():
 
         # 6. Saving accelerometer calibration
         Cmd_PackAndTx([0x17,0xff], 2, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 7. Reading the range of accelerometer and gyroscope
         # AccRange range 0=2g 1=4g 2=8g 3=16g
         # GyroRange range 0=256 1=512 2=1024 3=2048
         Cmd_PackAndTx([0x34], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 8. Read one time
         print("Place sensor flat and keep it completely still...")
@@ -158,7 +150,7 @@ def main():
             time.sleep(1)
         print("\rTaking measurement...                       ", flush=True)
         Cmd_PackAndTx([0x11], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
         print("\nCalibration complete! The acceleration reading should be close to 9.81 m/s².")
 
 if __name__ == "__main__":

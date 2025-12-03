@@ -348,3 +348,11 @@ def Cmd_PackAndTx(pDat, DLen, serial_write_func):
     # Send data via provided serial write function
     serial_write_func(buf)
     return 0
+
+def handle_response(ser, imu_callbacks):
+    """Wait for and process a complete response packet"""
+    while True:
+        data = ser.read(1)
+        if len(data) > 0:
+            if Cmd_GetPkt(data[0], callbacks=imu_callbacks) == 1:
+                break

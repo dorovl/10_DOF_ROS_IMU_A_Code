@@ -2,7 +2,7 @@ import serial
 import time
 
 # Import the reusable IMU parser library
-from imu_parser import Cmd_GetPkt, Cmd_PackAndTx
+from imu_parser import Cmd_GetPkt, Cmd_PackAndTx, handle_response
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
@@ -69,14 +69,6 @@ imu_callbacks = {
     'unknown_command': on_unknown_command,
 }
 
-def handle_response(ser):
-    """Wait for and process a complete response packet"""
-    while True:
-        data = ser.read(1)
-        if len(data) > 0:
-            if Cmd_GetPkt(data[0], callbacks=imu_callbacks) == 1:
-                break
-
 def main():
     """Main magnetometer calibration function"""
     with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
@@ -104,34 +96,34 @@ def main():
         params[9] = Cmd_ReportTag&0xff
         params[10] = (Cmd_ReportTag>>8)&0xff
         Cmd_PackAndTx(params, len(params), ser.write) # Send commands to sensors
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 2.Wake up sensor
         Cmd_PackAndTx([0x03], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 3.Disable proactive reporting (keep it off during calibration)
         Cmd_PackAndTx([0x18], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 4. Start magnetometer calibration
         Cmd_PackAndTx([0x32], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
         for i in range(30, 0, -1):
             print(f"\r{i} seconds remaining... ", end='', flush=True)
             time.sleep(1)
 
         # 5. Finish magnetometer calibration
         Cmd_PackAndTx([0x04], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # 6. Z axis angle reset to zero
         Cmd_PackAndTx([0x05], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         # Read final data
         Cmd_PackAndTx([0x11], 1, ser.write)
-        handle_response(ser)
+        handle_response(ser, imu_callbacks)
 
         print("Magnetometer Calibration Complete!")
 
