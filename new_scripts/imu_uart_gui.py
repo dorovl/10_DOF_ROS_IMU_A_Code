@@ -1,5 +1,4 @@
 import serial
-import time
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -14,8 +13,16 @@ ser_port = "COM18"     #This needs to be replaced with the corresponding serial 
 ser_baudrate = 115200 # Port baud rate
 ser_timeout = 2 # Serial port operation timeout time
 
-# Global orientation variables
-roll = pitch = yaw = 0.0
+# Global orientation variables (quaternion for rotation)
+quat_w = 1.0
+quat_x = 0.0
+quat_y = 0.0
+quat_z = 0.0
+
+# Euler angles for display only
+roll = 0.0
+pitch = 0.0
+yaw = 0.0
 
 # Initialize pygame and OpenGL
 video_flags = OPENGL|DOUBLEBUF
@@ -43,6 +50,27 @@ def init():
     glDepthFunc(GL_LEQUAL)
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
 
+def quat_to_matrix(w, x, y, z):
+    """Convert quaternion to 4x4 OpenGL rotation matrix"""
+    # Normalize quaternion
+    norm = (w*w + x*x + y*y + z*z) ** 0.5
+    if norm > 0:
+        w, x, y, z = w/norm, x/norm, y/norm, z/norm
+    
+    # Quaternion to rotation matrix conversion
+    xx, yy, zz = x*x, y*y, z*z
+    xy, xz, yz = x*y, x*z, y*z
+    wx, wy, wz = w*x, w*y, w*z
+    
+    # OpenGL uses column-major order
+    matrix = [
+        1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),   0,
+        2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),   0,
+        2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy), 0,
+        0,           0,           0,           1
+    ]
+    return matrix
+
 def drawText(position, textString):
     """Draw text on the OpenGL screen"""
     font = pygame.font.SysFont ("Courier", 18, True)
@@ -59,16 +87,14 @@ def draw():
     glLoadIdentity()
     glTranslatef(0,0.0,-7.0)
 
-    # Display orientation values as text
+    # Display orientation values as text (Euler angles for readability)
     osd_text = "pitch: " + str("{0:.2f}".format(pitch)) + ", roll: " + str("{0:.2f}".format(roll))
     osd_line = osd_text + ", yaw: " + str("{0:.2f}".format(yaw))
     drawText((-1,-2, 2), osd_line)
 
-    # the way I'm holding the IMU board, X and Y axis are switched
-    # with respect to the OpenGL coordinate system
-    glRotatef(yaw, 0.0, 1.0, 0.0)  # Yaw,   rotate around y-axis
-    glRotatef(-1*pitch ,1.0,0.0,0.0)        # Pitch, rotate around x-axis
-    glRotatef(-1*roll ,0.0,0.0,1.0)     # Roll,  rotate around z-axis
+    # Apply quaternion rotation using rotation matrix (no gimbal lock!)
+    rot_matrix = quat_to_matrix(quat_w, quat_x, quat_y, quat_z)
+    glMultMatrixf(rot_matrix)
 
     # Draw a colored box representing the IMU board
     glBegin(GL_QUADS)
@@ -126,26 +152,27 @@ def on_reporting_enabled_ack():
     print("Proactive reporting enabled. Starting visualization...")
 
 def on_quaternion(w, x, y, z):
-    """Called when quaternion data is received"""
-    # Commented for performance
-    # print("\tw: %.3f"%w)
-    # print("\tx: %.3f"%x)
-    # print("\ty: %.3f"%y)
-    # print("\tz: %.3f"%z)
-    pass
-
-def on_euler_angles(roll_val, pitch_val, yaw_val):
-    """Called when Euler angle data is received - updates visualization"""
-    global roll, pitch, yaw
-
-    # Update global orientation variables
-    roll = roll_val
-    pitch = pitch_val
-    yaw = yaw_val
-
+    """Called when quaternion data is received - updates visualization (no gimbal lock!)"""
+    global quat_w, quat_x, quat_y, quat_z
+    
+    # Apply axis remapping (same as Kivy app: w, -x, z, y)
+    quat_w = w
+    quat_x = -x
+    quat_y = z
+    quat_z = y
+    
     # Redraw the 3D visualization
     draw()
     pygame.display.flip()
+
+def on_euler_angles(roll_val, pitch_val, yaw_val):
+    """Called when Euler angle data is received - store for display"""
+    global roll, pitch, yaw
+    
+    # Store Euler angles for on-screen display
+    roll = roll_val
+    pitch = pitch_val
+    yaw = yaw_val
 
 def on_unknown_command(command_id):
     """Called when unknown command ID is received"""

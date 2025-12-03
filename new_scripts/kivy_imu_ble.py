@@ -201,12 +201,6 @@ class BLEWidget(BoxLayout):
             'reporting_enabled_ack': self.on_reporting_enabled_ack,
             'ble_stay_connected_ack': self.on_ble_stay_connected_ack,
             'ble_highspeed_ack': self.on_ble_highspeed_ack,
-            'packet_header': self.on_packet_header,
-            'accel_no_gravity': self.on_accel_no_gravity,
-            'accel_with_gravity': self.on_accel_with_gravity,
-            'gyroscope': self.on_gyroscope,
-            'magnetometer': self.on_magnetometer,
-            'environmental': self.on_environmental,
             'quaternion': self.on_quaternion,
             'euler_angles': self.on_euler_angles,
             'unknown_command': self.on_unknown_command,
@@ -246,41 +240,14 @@ class BLEWidget(BoxLayout):
         """Called when BLE high-speed communication acknowledgment is received (0x46)"""
         print("BLE high-speed communication enabled.")
 
-    def on_packet_header(self, tag, timestamp_ms):
-        """Called when packet header is parsed"""
-        print(f"\nSubscribe tag: 0x{tag:04x}, ms: {timestamp_ms}")
-
-    def on_accel_no_gravity(self, ax, ay, az):
-        """Called when acceleration data without gravity is received"""
-        print(f"\taX: {ax:.3f}, aY: {ay:.3f}, aZ: {az:.3f}")
-
-    def on_accel_with_gravity(self, ax, ay, az, magnitude):
-        """Called when acceleration data with gravity is received"""
-        print(f"\tAX: {ax:.3f}, AY: {ay:.3f}, AZ: {az:.3f}, Mag: {magnitude:.3f}")
-
-    def on_gyroscope(self, gx, gy, gz):
-        """Called when gyroscope data is received"""
-        print(f"\tGX: {gx:.3f}, GY: {gy:.3f}, GZ: {gz:.3f}")
-
-    def on_magnetometer(self, cx, cy, cz, magnitude):
-        """Called when magnetometer data is received"""
-        print(f"\tCX: {cx:.3f}, CY: {cy:.3f}, CZ: {cz:.3f}, Mag: {magnitude:.3f}")
-
-    def on_environmental(self, temperature, air_pressure, height):
-        """Called when environmental data is received"""
-        print(f"\tTemp: {temperature:.2f}°C, Pressure: {air_pressure:.3f}, Height: {height:.3f}")
-
     def on_quaternion(self, w, x, y, z):
         """Called when quaternion data is received - updates visualization (no gimbal lock!)"""
-        print(f"\tw: {w:.3f}, x: {x:.3f}, y: {y:.3f}, z: {z:.3f}")
         if self.visualizer:
             # Schedule UI update on main thread using quaternions
             Clock.schedule_once(lambda dt: self.visualizer.set_quaternion(w, x, y, z), 0)
 
     def on_euler_angles(self, roll_val, pitch_val, yaw_val):
-        """Called when Euler angle data is received - just for display"""
-        print(f"\tRoll: {roll_val:.3f}°, Pitch: {pitch_val:.3f}°, Yaw: {yaw_val:.3f}°")
-        
+        """Called when Euler angle data is received - just for display"""        
         # Update global orientation variables for display
         self.roll = roll_val
         self.pitch = pitch_val
