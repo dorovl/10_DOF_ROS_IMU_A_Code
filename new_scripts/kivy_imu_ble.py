@@ -11,6 +11,7 @@ from kivy.graphics.opengl import glEnable, glDisable, GL_DEPTH_TEST
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 import math
+import threading
 
 # Import the reusable IMU parser library
 from imu_parser import Cmd_RxUnpack
@@ -139,7 +140,6 @@ class BLEWidget(BoxLayout):
         
         # BLE state
         self.client = None
-        self.disconnected_event = asyncio.Event()
         
         # Setup IMU callbacks
         self.imu_callbacks = {
@@ -234,9 +234,25 @@ class BLEWidget(BoxLayout):
         # Call Cmd_RxUnpack directly with the data (like the working example)
         Cmd_RxUnpack(data, len(data), callbacks=self.imu_callbacks)
 
+    def run_ble_in_thread(self):
+        """Run BLE connection in a separate thread with its own event loop"""
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            loop.run_until_complete(self.ble_task())
+        except Exception as e:
+            print(f"BLE Error: {e}")
+            self.update_status(f"❌ Error: {e}")
+            Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
+        finally:
+            loop.close()
+
     async def ble_task(self):
         """Main BLE connection and communication task"""
         self.update_status("🔍 Scanning for IMU device...")
+        print("Starting scan...")
         
         # Use the same scanner parameters as the working example
         device = await BleakScanner.find_device_by_address(
@@ -246,19 +262,25 @@ class BLEWidget(BoxLayout):
         if device is None:
             self.update_status(f"❌ Device {par_device_addr} not found!")
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
+            print(f"Could not find device with address {par_device_addr}")
             return
 
         self.update_status("📡 Connecting to device...")
-        self.disconnected_event.clear()
+        print("Connecting to device...")
+        
+        # Event for disconnect handling
+        disconnected_event = asyncio.Event()
 
         def disconnected_callback(client):
+            print("Disconnected callback called!")
             self.update_status("❌ Device disconnected!")
-            self.disconnected_event.set()
+            disconnected_event.set()
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
 
         async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
             self.client = client
             self.update_status("✓ Connected! Initializing...")
+            print("Connected")
             
             # Start notifications
             await client.start_notify(par_notification_characteristic, self.notification_handler)
@@ -289,11 +311,13 @@ class BLEWidget(BoxLayout):
             await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
 
             self.update_status("✓ Streaming IMU data...")
+            print("Receiving data...")
 
             # Wait until disconnected
-            await self.disconnected_event.wait()
+            await disconnected_event.wait()
 
         self.update_status("Disconnected.")
+        print("Disconnected")
 
     def on_start_ble(self, instance):
         """Called when the start button is pressed"""
@@ -301,8 +325,9 @@ class BLEWidget(BoxLayout):
         self.start_button.text = "Connecting..."
         self.update_status("Launching BLE connection...")
 
-        # Run BLE task without blocking Kivy main thread
-        asyncio.ensure_future(self.ble_task())
+        # Run BLE in a separate thread to avoid blocking Kivy's main loop
+        ble_thread = threading.Thread(target=self.run_ble_in_thread, daemon=True)
+        ble_thread.start()
 
 
 class BLEIMUApp(App):
