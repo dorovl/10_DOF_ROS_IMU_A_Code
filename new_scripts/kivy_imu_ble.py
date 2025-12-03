@@ -36,40 +36,11 @@ class IMU3DVisualizer(Widget):
         self.bind(pos=self.update_canvas, size=self.update_canvas)
         self.update_canvas()
     
-    def set_orientation(self, roll, pitch, yaw):
-        """Update the orientation angles (kept for compatibility)"""
-        self.roll = roll
-        self.pitch = pitch
-        self.yaw = yaw
-        # Not used for visualization anymore - quaternions are used instead
-    
     def set_quaternion(self, w, x, y, z):
         """Update orientation using quaternion (avoids gimbal lock!)"""
-        # Test different mappings - uncomment ONE line at a time:
-        
-        # Current (works for yaw, wrong roll/pitch sense):
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, y, x
-        
-        # Your suggestion (yaw good, pitch/roll flipped):
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, z, -y
-        
-        # Try negating different axes:
+        # Correct IMU to OpenGL coordinate system mapping
+        # This makes yaw, pitch, and roll all rotate correctly
         self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, z, y
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, -z, y
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, z, y
-        
-        # Try other swaps:
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, x, z
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, x, y
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, y, x
-        
-        # Try with negations:
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -y, -z, x
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, -z, -x
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, -z, -y
-        
-        # Conjugate (invert all):
-        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, -y, -z
         
         self.update_canvas()
     
@@ -254,17 +225,17 @@ class BLEWidget(BoxLayout):
     
     def on_config_ack(self):
         """Called when configuration acknowledgment is received (0x12)"""
-        self.update_status("✓ Configuration set successfully")
+        self.update_status("Configuration set successfully")
         print("Configuration set successfully.")
 
     def on_wakeup_ack(self):
         """Called when sensor wake-up acknowledgment is received (0x03)"""
-        self.update_status("✓ Sensor woken up")
+        self.update_status("Sensor woken up")
         print("Sensor woken up.")
 
     def on_reporting_enabled_ack(self):
         """Called when proactive reporting enabled acknowledgment is received (0x19)"""
-        self.update_status("✓ Streaming IMU data...")
+        self.update_status("Streaming IMU data...")
         print("Proactive reporting enabled.")
 
     def on_ble_stay_connected_ack(self):
@@ -338,14 +309,14 @@ class BLEWidget(BoxLayout):
             loop.run_until_complete(self.ble_task())
         except Exception as e:
             print(f"BLE Error: {e}")
-            self.update_status(f"❌ Error: {e}")
+            self.update_status(f"Error: {e}")
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
         finally:
             loop.close()
 
     async def ble_task(self):
         """Main BLE connection and communication task"""
-        self.update_status("🔍 Scanning for IMU device...")
+        self.update_status("Scanning for IMU device...")
         print("Starting scan...")
         
         # Use the same scanner parameters as the working example
@@ -354,12 +325,12 @@ class BLEWidget(BoxLayout):
         )
 
         if device is None:
-            self.update_status(f"❌ Device {par_device_addr} not found!")
+            self.update_status(f"Device {par_device_addr} not found!")
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
             print(f"Could not find device with address {par_device_addr}")
             return
 
-        self.update_status("📡 Connecting to device...")
+        self.update_status("Connecting to device...")
         print("Connecting to device...")
         
         # Event for disconnect handling
@@ -367,13 +338,14 @@ class BLEWidget(BoxLayout):
 
         def disconnected_callback(client):
             print("Disconnected callback called!")
-            self.update_status("❌ Device disconnected!")
+            self.update_status("Device disconnected!")
             disconnected_event.set()
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
 
         async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
             self.client = client
-            self.update_status("✓ Connected! Initializing...")
+            self.update_status("Connected! Initializing...")
+            Clock.schedule_once(lambda dt: setattr(self.start_button, 'text', 'Connected'), 0)
             print("Connected")
             
             # Start notifications
@@ -404,7 +376,7 @@ class BLEWidget(BoxLayout):
             # Enable proactive reporting
             await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
 
-            self.update_status("✓ Streaming IMU data...")
+            self.update_status("Streaming IMU data...")
             print("Receiving data...")
 
             # Wait until disconnected
