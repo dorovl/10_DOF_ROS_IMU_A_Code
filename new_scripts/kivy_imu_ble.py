@@ -311,6 +311,7 @@ class BLEWidget(BoxLayout):
             print(f"BLE Error: {e}")
             self.update_status(f"Error: {e}")
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
+            Clock.schedule_once(lambda dt: setattr(self.start_button, 'text', 'Connect to IMU'), 0)
         finally:
             loop.close()
 
@@ -327,6 +328,7 @@ class BLEWidget(BoxLayout):
         if device is None:
             self.update_status(f"Device {par_device_addr} not found!")
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
+            Clock.schedule_once(lambda dt: setattr(self.start_button, 'text', 'Connect to IMU'), 0)
             print(f"Could not find device with address {par_device_addr}")
             return
 
@@ -341,6 +343,7 @@ class BLEWidget(BoxLayout):
             self.update_status("Device disconnected!")
             disconnected_event.set()
             Clock.schedule_once(lambda dt: setattr(self.start_button, 'disabled', False), 0)
+            Clock.schedule_once(lambda dt: setattr(self.start_button, 'text', 'Connect to IMU'), 0)
 
         async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
             self.client = client
