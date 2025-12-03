@@ -146,6 +146,8 @@ class BLEWidget(BoxLayout):
             'config_ack': self.on_config_ack,
             'wakeup_ack': self.on_wakeup_ack,
             'reporting_enabled_ack': self.on_reporting_enabled_ack,
+            'ble_stay_connected_ack': self.on_ble_stay_connected_ack,
+            'ble_highspeed_ack': self.on_ble_highspeed_ack,
             'packet_header': self.on_packet_header,
             'accel_no_gravity': self.on_accel_no_gravity,
             'accel_with_gravity': self.on_accel_with_gravity,
@@ -182,6 +184,14 @@ class BLEWidget(BoxLayout):
         """Called when proactive reporting enabled acknowledgment is received (0x19)"""
         self.update_status("✓ Streaming IMU data...")
         print("Proactive reporting enabled.")
+
+    def on_ble_stay_connected_ack(self):
+        """Called when BLE stay connected acknowledgment is received (0x29)"""
+        print("BLE stay connected enabled.")
+
+    def on_ble_highspeed_ack(self):
+        """Called when BLE high-speed communication acknowledgment is received (0x46)"""
+        print("BLE high-speed communication enabled.")
 
     def on_packet_header(self, tag, timestamp_ms):
         """Called when packet header is parsed"""

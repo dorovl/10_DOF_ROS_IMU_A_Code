@@ -47,6 +47,8 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             - 'wakeup_ack': callback()
             - 'reporting_disabled_ack': callback()
             - 'reporting_enabled_ack': callback()
+            - 'ble_stay_connected_ack': callback()
+            - 'ble_highspeed_ack': callback()
             - 'range_config_ack': callback()
             - 'mag_calibration_started_ack': callback()
             - 'mag_calibration_saved_ack': callback()
@@ -87,6 +89,18 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
     if buf[0] == 0x19:
         if 'reporting_enabled_ack' in callbacks:
             callbacks['reporting_enabled_ack']()
+        return
+
+    # Handle BLE stay connected command acknowledgment (0x29)
+    if buf[0] == 0x29:
+        if 'ble_stay_connected_ack' in callbacks:
+            callbacks['ble_stay_connected_ack']()
+        return
+
+    # Handle BLE high-speed communication acknowledgment (0x46)
+    if buf[0] == 0x46:
+        if 'ble_highspeed_ack' in callbacks:
+            callbacks['ble_highspeed_ack']()
         return
 
     # Handle range configuration acknowledgment (0x33)
