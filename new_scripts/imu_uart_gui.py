@@ -7,15 +7,12 @@ import pygame
 from pygame.locals import *
 
 # Import the reusable IMU parser library
-from imu_parser import Cmd_GetPkt, Cmd_PackAndTx
+from imu_parser import Cmd_GetPkt, Cmd_PackAndTx, handle_response
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
 ser_baudrate = 115200 # Port baud rate
 ser_timeout = 2 # Serial port operation timeout time
-
-# Open the serial port
-ser = serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout)
 
 # Global orientation variables
 roll = pitch = yaw = 0.0
@@ -115,6 +112,18 @@ def draw():
 # ========== IMU Data Callbacks ==========
 # These callbacks are invoked by the imu_parser when data is received
 
+def on_config_ack():
+    """Called when configuration acknowledgment is received (0x12)"""
+    print("Configuration set successfully.")
+
+def on_wakeup_ack():
+    """Called when sensor wake-up acknowledgment is received (0x03)"""
+    print("Sensor woken up.")
+
+def on_reporting_enabled_ack():
+    """Called when proactive reporting enabled acknowledgment is received (0x19)"""
+    print("Proactive reporting enabled.")
+
 def on_packet_received(hex_string, length):
     """Called when a complete packet is received"""
     print(f"U-Rx[Len={length}]:{hex_string}")
@@ -184,6 +193,9 @@ def on_unknown_command(command_id):
 
 # Create callbacks dictionary for the IMU parser
 imu_callbacks = {
+    'config_ack': on_config_ack,
+    'wakeup_ack': on_wakeup_ack,
+    'reporting_enabled_ack' : on_reporting_enabled_ack,
     'packet_received': on_packet_received,
     'packet_header': on_packet_header,
     'accel_no_gravity': on_accel_no_gravity,
@@ -196,51 +208,50 @@ imu_callbacks = {
     'unknown_command': on_unknown_command,
 }
 
-def imu_gui():
-    """
-    Main application function: initializes IMU sensor and runs the visualization loop
-    """
-    print("------------demo start--------------")
+def main():
+    with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
+        print("------------demo start--------------")
 
-    # Parameter settings
-    isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
-    barometerFilter = 2
-    Cmd_ReportTag = 0x7F # Feature subscription tag
-    params = bytearray([0x00 for i in range(0,11)])
-    params[0] = 0x12
-    params[1] = 5       #Stationary state acceleration threshold
-    params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
-    params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-    params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1)
-    params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
-    params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
-    params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
-    params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
-    params[9] = Cmd_ReportTag&0xff
-    params[10] = (Cmd_ReportTag>>8)&0xff
-    Cmd_PackAndTx(params, len(params), ser.write) # Send commands to sensors
-    time.sleep(0.2)
+        # Parameter settings
+        isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
+        barometerFilter = 2
+        Cmd_ReportTag = 0x7F # Feature subscription tag
+        params = bytearray([0x00 for i in range(0,11)])
+        params[0] = 0x12
+        params[1] = 5       #Stationary state acceleration threshold
+        params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
+        params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
+        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1)
+        params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
+        params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
+        params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
+        params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
+        params[9] = Cmd_ReportTag&0xff
+        params[10] = (Cmd_ReportTag>>8)&0xff
+        Cmd_PackAndTx(params, len(params), ser.write) # Send commands to sensors
+        handle_response(ser, imu_callbacks)
 
-    # 2.Wake up sensor
-    Cmd_PackAndTx([0x03], 1, ser.write)
-    time.sleep(0.2)
+        # 2.Wake up sensor
+        Cmd_PackAndTx([0x03], 1, ser.write)
+        handle_response(ser, imu_callbacks)
 
-    # 3.Enable proactive reporting
-    Cmd_PackAndTx([0x19], 1, ser.write)
+        # 3.Enable proactive reporting
+        Cmd_PackAndTx([0x19], 1, ser.write)
+        handle_response(ser, imu_callbacks)
 
-    resize(640,480)
-    init()
+        resize(640,480)
+        init()
 
-    # Loop to receive data and process it
-    while True:
-        event = pygame.event.poll()
-        if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-            pygame.quit()  #* quit pygame properly
-            break
+        # Loop to receive data and process it
+        while True:
+            event = pygame.event.poll()
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                pygame.quit()  #* quit pygame properly
+                break
 
-        data = ser.read(1) # read 1 bytes
-        if len(data) > 0: # if data is not empty
-            Cmd_GetPkt(data[0], callbacks=imu_callbacks)
+            data = ser.read(1) # read 1 bytes
+            if len(data) > 0: # if data is not empty
+                Cmd_GetPkt(data[0], callbacks=imu_callbacks)
 
-# Start the application
-imu_gui()
+if __name__ == "__main__":
+    main()
