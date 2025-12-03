@@ -13,7 +13,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 import math
 
 # Import the reusable IMU parser library
-from imu_parser import Cmd_GetPkt
+from imu_parser import Cmd_RxUnpack
 
 # BLE parameters (adjust to your device)
 par_notification_characteristic = 0x0007
@@ -146,7 +146,6 @@ class BLEWidget(BoxLayout):
             'config_ack': self.on_config_ack,
             'wakeup_ack': self.on_wakeup_ack,
             'reporting_enabled_ack': self.on_reporting_enabled_ack,
-            'packet_received': self.on_packet_received,
             'packet_header': self.on_packet_header,
             'accel_no_gravity': self.on_accel_no_gravity,
             'accel_with_gravity': self.on_accel_with_gravity,
@@ -183,10 +182,6 @@ class BLEWidget(BoxLayout):
         """Called when proactive reporting enabled acknowledgment is received (0x19)"""
         self.update_status("✓ Streaming IMU data...")
         print("Proactive reporting enabled.")
-
-    def on_packet_received(self, hex_string, length):
-        """Called when a complete packet is received"""
-        print(f"U-Rx[Len={length}]:{hex_string}")
 
     def on_packet_header(self, tag, timestamp_ms):
         """Called when packet header is parsed"""
@@ -235,14 +230,18 @@ class BLEWidget(BoxLayout):
 
     def notification_handler(self, characteristic: BleakGATTCharacteristic, data: bytearray):
         """Called when BLE notification data is received"""
-        # Process each byte through the IMU parser state machine
-        for byte in data:
-            Cmd_GetPkt(byte, callbacks=self.imu_callbacks)
+        # BLE delivers the payload directly (no serial packet framing needed)
+        # Call Cmd_RxUnpack directly with the data (like the working example)
+        Cmd_RxUnpack(data, len(data), callbacks=self.imu_callbacks)
 
     async def ble_task(self):
         """Main BLE connection and communication task"""
         self.update_status("🔍 Scanning for IMU device...")
-        device = await BleakScanner.find_device_by_address(par_device_addr, timeout=10.0)
+        
+        # Use the same scanner parameters as the working example
+        device = await BleakScanner.find_device_by_address(
+            par_device_addr, cb=dict(use_bdaddr=False)
+        )
 
         if device is None:
             self.update_status(f"❌ Device {par_device_addr} not found!")
@@ -263,6 +262,7 @@ class BLEWidget(BoxLayout):
             
             # Start notifications
             await client.start_notify(par_notification_characteristic, self.notification_handler)
+            
             # Send initialization commands
             await client.write_gatt_char(par_write_characteristic, bytes([0x29]))
             await client.write_gatt_char(par_write_characteristic, bytes([0x46]))
@@ -287,6 +287,8 @@ class BLEWidget(BoxLayout):
 
             # Enable proactive reporting
             await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
+
+            self.update_status("✓ Streaming IMU data...")
 
             # Wait until disconnected
             await self.disconnected_event.wait()
