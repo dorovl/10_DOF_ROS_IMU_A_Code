@@ -42,7 +42,7 @@ def on_gyroscope(gx, gy, gz):
     print("\tGY: %.3f"%gy)  # Angular velocity GY
     print("\tGZ: %.3f"%gz)  # Angular velocity GZ
 
-def on_magnetometer(cx, cy, cz):
+def on_magnetometer(cx, cy, cz, magnitude):
     """Called when magnetometer data is received"""
     print("\tCX: %.3f"%cx);  # Magnetic field data CX
     print("\tCY: %.3f"%cy);  # Magnetic field data CY
