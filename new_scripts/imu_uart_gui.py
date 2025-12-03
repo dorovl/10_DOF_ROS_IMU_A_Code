@@ -20,7 +20,7 @@ roll = pitch = yaw = 0.0
 # Initialize pygame and OpenGL
 video_flags = OPENGL|DOUBLEBUF
 pygame.init()
-screen = pygame.display.set_mode((640,480), video_flags)
+screen = pygame.display.set_mode((1024,768), video_flags)
 pygame.display.set_caption("Press Esc to quit")
 
 def resize(width, height):
@@ -62,7 +62,7 @@ def draw():
     # Display orientation values as text
     osd_text = "pitch: " + str("{0:.2f}".format(pitch)) + ", roll: " + str("{0:.2f}".format(roll))
     osd_line = osd_text + ", yaw: " + str("{0:.2f}".format(yaw))
-    drawText((-2,-2, 2), osd_line)
+    drawText((-1,-2, 2), osd_line)
 
     # the way I'm holding the IMU board, X and Y axis are switched
     # with respect to the OpenGL coordinate system
@@ -111,6 +111,7 @@ def draw():
 
 # ========== IMU Data Callbacks ==========
 # These callbacks are invoked by the imu_parser when data is received
+# PERFORMANCE: Most prints commented out for smooth 60Hz animation
 
 def on_config_ack():
     """Called when configuration acknowledgment is received (0x12)"""
@@ -122,61 +123,20 @@ def on_wakeup_ack():
 
 def on_reporting_enabled_ack():
     """Called when proactive reporting enabled acknowledgment is received (0x19)"""
-    print("Proactive reporting enabled.")
-
-def on_packet_received(hex_string, length):
-    """Called when a complete packet is received"""
-    print(f"U-Rx[Len={length}]:{hex_string}")
-
-def on_packet_header(tag, timestamp_ms):
-    """Called when packet header is parsed"""
-    print("\n subscribe tag: 0x%04x"%tag)
-    print(" ms: ", timestamp_ms)
-
-def on_accel_no_gravity(ax, ay, az):
-    """Called when acceleration data without gravity is received"""
-    print("\taX: %.3f"%ax);  # Acceleration ax without gravity
-    print("\taY: %.3f"%ay);  # Acceleration ay without gravity
-    print("\taZ: %.3f"%az);  # Acceleration az without gravity
-
-def on_accel_with_gravity(ax, ay, az, magnitude):
-    """Called when acceleration data with gravity is received"""
-    print("\tAX: %.3f"%ax)  # Acceleration AX with gravity
-    print("\tAY: %.3f"%ay)  # Acceleration AY with gravity
-    print("\tAZ: %.3f"%az)  # Acceleration AZ with gravity
-
-def on_gyroscope(gx, gy, gz):
-    """Called when gyroscope data is received"""
-    print("\tGX: %.3f"%gx)  # Angular velocity GX
-    print("\tGY: %.3f"%gy)  # Angular velocity GY
-    print("\tGZ: %.3f"%gz)  # Angular velocity GZ
-
-def on_magnetometer(cx, cy, cz, magnitude):
-    """Called when magnetometer data is received"""
-    print("\tCX: %.3f"%cx);  # Magnetic field data CX
-    print("\tCY: %.3f"%cy);  # Magnetic field data CY
-    print("\tCZ: %.3f"%cz);  # Magnetic field data CZ
-
-def on_environmental(temperature, air_pressure, height):
-    """Called when environmental data is received"""
-    print("\ttemperature: %.2f"%temperature)  # temperature
-    print("\tairPressure: %.3f"%air_pressure);  # air pressure
-    print("\theight: %.3f"%height);  # high
+    print("Proactive reporting enabled. Starting visualization...")
 
 def on_quaternion(w, x, y, z):
     """Called when quaternion data is received"""
-    print("\tw: %.3f"%w);  # Quaternion w
-    print("\tx: %.3f"%x);  # Quaternion x
-    print("\ty: %.3f"%y);  # Quaternion y
-    print("\tz: %.3f"%z);  # Quaternion z
+    # Commented for performance
+    # print("\tw: %.3f"%w)
+    # print("\tx: %.3f"%x)
+    # print("\ty: %.3f"%y)
+    # print("\tz: %.3f"%z)
+    pass
 
 def on_euler_angles(roll_val, pitch_val, yaw_val):
     """Called when Euler angle data is received - updates visualization"""
     global roll, pitch, yaw
-
-    print("\tangleX: %.3f"%roll_val);   # Euler angle x (roll)
-    print("\tangleY: %.3f"%pitch_val);  # Euler angle y (pitch)
-    print("\tangleZ: %.3f"%yaw_val);    # Euler angle z (yaw)
 
     # Update global orientation variables
     roll = roll_val
@@ -196,13 +156,6 @@ imu_callbacks = {
     'config_ack': on_config_ack,
     'wakeup_ack': on_wakeup_ack,
     'reporting_enabled_ack' : on_reporting_enabled_ack,
-    'packet_received': on_packet_received,
-    'packet_header': on_packet_header,
-    'accel_no_gravity': on_accel_no_gravity,
-    'accel_with_gravity': on_accel_with_gravity,
-    'gyroscope': on_gyroscope,
-    'magnetometer': on_magnetometer,
-    'environmental': on_environmental,
     'quaternion': on_quaternion,
     'euler_angles': on_euler_angles,
     'unknown_command': on_unknown_command,
@@ -239,10 +192,13 @@ def main():
         Cmd_PackAndTx([0x19], 1, ser.write)
         handle_response(ser, imu_callbacks)
 
-        resize(640,480)
+        resize(1024,768)
         init()
 
         # Loop to receive data and process it
+        print("\nVisualization running - orientation values shown on screen")
+        print("Press ESC to quit\n")
+        
         while True:
             event = pygame.event.poll()
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
