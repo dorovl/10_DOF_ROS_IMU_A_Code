@@ -20,6 +20,22 @@ imu_dat = array('f',[0.0 for i in range(0,34)])
 
 # ========== IMU Data Callbacks ==========
 
+def on_config_ack():
+    """Called when configuration acknowledgment is received (0x12)"""
+    print("Configuration set successfully.")
+
+def on_reporting_enabled_ack():
+    """Called when proactive reporting enabled acknowledgment is received (0x19)"""
+    print("Proactive reporting enabled.")
+
+def on_ble_stay_connected_ack():
+    """Called when BLE stay connected acknowledgment is received (0x29)"""
+    print("BLE stay connected enabled.")
+
+def on_ble_highspeed_ack():
+    """Called when BLE high-speed communication acknowledgment is received (0x46)"""
+    print("BLE high-speed communication enabled.")
+
 def on_packet_header(tag, timestamp_ms):
     """Called when packet header is parsed"""
     print("\n subscribe tag: 0x%04x"%tag)
@@ -110,6 +126,10 @@ def on_unknown_command(command_id):
 
 # Create callbacks dictionary for the IMU parser
 imu_callbacks = {
+    'config_ack': on_config_ack,
+    'reporting_enabled_ack': on_reporting_enabled_ack,
+    'ble_stay_connected_ack': on_ble_stay_connected_ack,
+    'ble_highspeed_ack': on_ble_highspeed_ack,
     'packet_header': on_packet_header,
     'accel_no_gravity': on_accel_no_gravity,
     'accel_with_gravity': on_accel_with_gravity,
@@ -150,6 +170,8 @@ async def main():
     print("connecting to device...")
     async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
         print("Connected")
+
+        # Start notifications
         await client.start_notify(par_notification_characteristic, notification_handler)
         # stay connected 0x29
         await client.write_gatt_char(par_write_characteristic, bytes([0x29]))
