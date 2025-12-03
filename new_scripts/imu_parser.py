@@ -273,7 +273,7 @@ def Cmd_GetPkt(byte, callbacks=None):
     elif _RxIndex == 1: # The address code of the data body
         _buf[_i] = byte
         _i += 1
-        if byte == 255: # 255 is the broadcast address，module as slave，Its address cannot appear 255
+        if byte == 255: # 255 is the broadcast address, module as slave, Its address cannot appear 255
             _RxIndex = 0
         else:
             _RxIndex += 1
@@ -304,7 +304,7 @@ def Cmd_GetPkt(byte, callbacks=None):
             
     elif _RxIndex == 5: # end code
         _RxIndex = 0
-        if byte == CmdPacket_End: # 捕Get the complete package
+        if byte == CmdPacket_End: # Get the complete package
             _buf[_i] = byte
             _i += 1
             hex_string = " ".join(f"{b:02X}" for b in _buf[0:_i])
