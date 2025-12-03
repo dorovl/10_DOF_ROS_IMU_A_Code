@@ -35,7 +35,6 @@ def Cmd_RxUnpack(buf, DLen):
             else:
                 print(f"Calibration status: 0x{status:02X}.")
         return
-
     # Handle configuration acknowledgments
     if buf[0] == 0x12:
         print("Configuration set successfully.")
@@ -55,6 +54,17 @@ def Cmd_RxUnpack(buf, DLen):
 
     if buf[0] == 0x33:
         print("Range configuration set.")
+
+    if buf[0] == 0x32:
+        print("Magnetometer calibration started.")
+        return
+
+    if buf[0] == 0x04:
+        print("Magnetometer calibration saved!")
+        return
+
+    if buf[0] == 0x05:
+        print("Z-axis angle reset to zero.")
         return
 
     #print("rev data:",buf)

@@ -6,6 +6,7 @@ import numpy as np
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.
 ser_baudrate = 115200 # 串Port baud rate
+
 ser_timeout = 2 # Serial port operation timeout time
 
 def Cmd_RxUnpack(buf, DLen):
@@ -18,6 +19,22 @@ def Cmd_RxUnpack(buf, DLen):
     scaleAirPressure = 0.0002384185791
     scaleHeight      = 0.0010728836
 
+    # Handle calibration status messages
+    if buf[0] == 0x17:
+        global faces_collected
+        if DLen >= 2:
+            status = buf[1]
+            if status == 0xFF:
+                print("Calibration saved!")
+            elif status >= 0x01 and status <= 0x06:
+                faces_collected = status
+                if faces_collected != 6:
+                    print(f"Calibration progress: Face {faces_collected}/6 collected. Change the face please!")
+                else:
+                    print(f"Calibration progress: Face {faces_collected}/6 collected.")
+            else:
+                print(f"Calibration status: 0x{status:02X}.")
+        return
     # Handle configuration acknowledgments
     if buf[0] == 0x12:
         print("Configuration set successfully.")
@@ -34,6 +51,9 @@ def Cmd_RxUnpack(buf, DLen):
     if buf[0] == 0x19:
         print("Proactive reporting enabled.")
         return
+
+    if buf[0] == 0x33:
+        print("Range configuration set.")
 
     if buf[0] == 0x32:
         print("Magnetometer calibration started.")
@@ -69,6 +89,8 @@ def Cmd_RxUnpack(buf, DLen):
             # print("\tAY: %.3f"%tmpY) # Acceleration AY gravity
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # print("\tAZ: %.3f"%tmpZ) # Acceleration AZ gravity
+            tmpAbs = np.sqrt(tmpX*tmpX + tmpY*tmpY + tmpZ*tmpZ)
+            print("\tAbs: %.3f"%tmpAbs) # Acceleration module
 
         if ((ctl & 0x0004) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
@@ -121,6 +143,10 @@ def Cmd_RxUnpack(buf, DLen):
             # print("\tangleY: %.3f"%tmpY); # Euler angles y
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # print("\tangleZ: %.3f"%tmpZ); # Euler angles z
+
+    elif buf[0] == 0x34:
+        print("\taccelRange: %.3f"%buf[1]); # accelRange
+        print("\tgyroRange: %.3f"%buf[2]); # gyroRange
     else:
         print(f"Error! Command ID not defined: 0x{buf[0]:02X}.")
 
