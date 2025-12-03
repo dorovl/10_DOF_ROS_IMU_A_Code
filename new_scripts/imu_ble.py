@@ -13,7 +13,7 @@ par_notification_characteristic=0x0007
 # par_write_characteristic="0000ae01-0000-1000-8000-00805f9b34fb"
 par_write_characteristic=0x0005
 
-par_device_addr="70:53:B2:02:20:02" # MAC address of the device You need to fill in the mac address of the device here
+par_device_addr="AC:25:DD:6E:69:4D" # MAC address of the device You need to fill in the mac address of the device here
 
 # Global IMU data array
 imu_dat = array('f',[0.0 for i in range(0,34)])
@@ -151,17 +151,10 @@ async def main():
     async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
         print("Connected")
         await client.start_notify(par_notification_characteristic, notification_handler)
-
         # stay connected 0x29
-        wakestr=bytes([0x29])
-        await client.write_gatt_char(par_write_characteristic, wakestr)
-        await asyncio.sleep(0.2)
-        print("------------------------------------------------")
-
+        await client.write_gatt_char(par_write_characteristic, bytes([0x29]))
         # Try to use Bluetooth high-speed communication features 0x46
-        fast=bytes([0x46])
-        await client.write_gatt_char(par_write_characteristic, fast)
-        await asyncio.sleep(0.2)
+        await client.write_gatt_char(par_write_characteristic, bytes([0x46]))
 
         # Parameter settings
         isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
@@ -180,10 +173,9 @@ async def main():
         params[9] = Cmd_ReportTag&0xff
         params[10] = (Cmd_ReportTag>>8)&0xff
         await client.write_gatt_char(par_write_characteristic, params)
-        await asyncio.sleep(0.2)
 
-        notes=bytes([0x19])
-        await client.write_gatt_char(par_write_characteristic, notes)
+        # Enable proactive reporting
+        await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
 
         # Add a loop so that the program does not exit while receiving data
         while not disconnected_event.is_set():
