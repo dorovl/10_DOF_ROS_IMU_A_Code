@@ -1,5 +1,4 @@
 import serial
-import time
 
 # Import the reusable IMU parser library
 from imu_parser import Cmd_GetPkt, Cmd_PackAndTx, handle_response

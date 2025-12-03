@@ -2,7 +2,7 @@ import serial
 import time
 
 # Import the reusable IMU parser library
-from imu_parser import Cmd_GetPkt, Cmd_PackAndTx, handle_response
+from imu_parser import Cmd_PackAndTx, handle_response
 
 # Set the correct serial port parameters------------------------
 ser_port = "COM18"     #This needs to be replaced with the corresponding serial port number. For Windows systems, it is written as COMx. If it is Linux, it needs to be adjusted according to the system used, such as /dev/ttyUSBx or /dev/ttySx.

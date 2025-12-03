@@ -5,18 +5,22 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
-from kivy.graphics import Color, Quad
+from kivy.graphics import Color
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
-import math
 import threading
 
 # Import the reusable IMU parser library
 from imu_parser import Cmd_RxUnpack
 
 # BLE parameters (adjust to your device)
-par_notification_characteristic = 0x0007
-par_write_characteristic = 0x0005
+# Characteristic UUID of the device
+# par_notification_characteristic="0000ae02-0000-1000-8000-00805f9b34fb"
+par_notification_characteristic=0x0007
+# Characteristic UUID of the device (with write attribute Write)
+# par_write_characteristic="0000ae01-0000-1000-8000-00805f9b34fb"
+par_write_characteristic=0x0005
+
 par_device_addr = "AC:25:DD:6E:69:4D"  # Change to your device MAC
 
 
