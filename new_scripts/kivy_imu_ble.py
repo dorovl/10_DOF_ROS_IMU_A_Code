@@ -28,40 +28,55 @@ class IMU3DVisualizer(Widget):
         self.roll = 0.0
         self.pitch = 0.0
         self.yaw = 0.0
+        # Store quaternion
+        self.quat_w = 1.0
+        self.quat_x = 0.0
+        self.quat_y = 0.0
+        self.quat_z = 0.0
         self.bind(pos=self.update_canvas, size=self.update_canvas)
         self.update_canvas()
     
     def set_orientation(self, roll, pitch, yaw):
-        """Update the orientation angles and redraw"""
+        """Update the orientation angles (kept for compatibility)"""
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw
+        # Not used for visualization anymore - quaternions are used instead
+    
+    def set_quaternion(self, w, x, y, z):
+        """Update orientation using quaternion (avoids gimbal lock!)"""
+        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, z, y
         self.update_canvas()
     
-    def _rotate_point(self, x, y, z, roll, pitch, yaw):
-        """Apply rotation transformations to a 3D point matching OpenGL order"""
-        # Convert to radians
-        roll_rad = math.radians(roll)
-        pitch_rad = math.radians(pitch)
-        yaw_rad = math.radians(yaw)
+    def _rotate_point_quat(self, x, y, z):
+        """Rotate point using quaternion (no gimbal lock!)"""
+        # Convert quaternion to rotation
+        w, qx, qy, qz = self.quat_w, self.quat_x, self.quat_y, self.quat_z
         
-        # Apply rotations in OpenGL order: yaw (Y-axis), pitch (X-axis), roll (Z-axis)
-        # Rotation around Y-axis (yaw)
-        x1 = x * math.cos(yaw_rad) + z * math.sin(yaw_rad)
-        z1 = -x * math.sin(yaw_rad) + z * math.cos(yaw_rad)
-        y1 = y
+        # Quaternion rotation formula
+        # v' = v + 2*q.xyz × (q.xyz × v + q.w*v)
         
-        # Rotation around X-axis (pitch)
-        y2 = y1 * math.cos(pitch_rad) - z1 * math.sin(pitch_rad)
-        z2 = y1 * math.sin(pitch_rad) + z1 * math.cos(pitch_rad)
-        x2 = x1
+        # First cross product: q.xyz × v
+        cx1 = qy * z - qz * y
+        cy1 = qz * x - qx * z
+        cz1 = qx * y - qy * x
         
-        # Rotation around Z-axis (roll)
-        x3 = x2 * math.cos(roll_rad) - y2 * math.sin(roll_rad)
-        y3 = x2 * math.sin(roll_rad) + y2 * math.cos(roll_rad)
-        z3 = z2
+        # Add q.w * v
+        cx1 += w * x
+        cy1 += w * y
+        cz1 += w * z
         
-        return x3, y3, z3
+        # Second cross product: q.xyz × result
+        cx2 = qy * cz1 - qz * cy1
+        cy2 = qz * cx1 - qx * cz1
+        cz2 = qx * cy1 - qy * cx1
+        
+        # Final result
+        rx = x + 2.0 * cx2
+        ry = y + 2.0 * cy2
+        rz = z + 2.0 * cz2
+        
+        return rx, ry, rz
     
     def _project_3d_to_2d(self, x, y, z, scale, cx, cy):
         """Simple orthographic projection - no perspective"""
@@ -113,8 +128,8 @@ class IMU3DVisualizer(Widget):
             face_vertices = []
             for vert_idx in range(4):
                 v = vertices[face_idx * 4 + vert_idx]
-                # Apply rotations matching OpenGL: yaw, -pitch, -roll
-                rx, ry, rz = self._rotate_point(v[0], v[1], v[2], -self.roll, -self.pitch, self.yaw)
+                # Use quaternion rotation (no gimbal lock!)
+                rx, ry, rz = self._rotate_point_quat(v[0], v[1], v[2])
                 # Project to 2D
                 px, py, pz = self._project_3d_to_2d(rx, ry, rz, scale, cx, cy)
                 face_vertices.append((px, py, pz))
@@ -260,21 +275,23 @@ class BLEWidget(BoxLayout):
         print(f"\tTemp: {temperature:.2f}°C, Pressure: {air_pressure:.3f}, Height: {height:.3f}")
 
     def on_quaternion(self, w, x, y, z):
-        """Called when quaternion data is received"""
+        """Called when quaternion data is received - updates visualization (no gimbal lock!)"""
         print(f"\tw: {w:.3f}, x: {x:.3f}, y: {y:.3f}, z: {z:.3f}")
+        if self.visualizer:
+            # Schedule UI update on main thread using quaternions
+            Clock.schedule_once(lambda dt: self.visualizer.set_quaternion(w, x, y, z), 0)
 
     def on_euler_angles(self, roll_val, pitch_val, yaw_val):
-        """Called when Euler angle data is received - updates visualization"""
+        """Called when Euler angle data is received - just for display"""
         print(f"\tRoll: {roll_val:.3f}°, Pitch: {pitch_val:.3f}°, Yaw: {yaw_val:.3f}°")
         
-        # Update global orientation variables
+        # Update global orientation variables for display
         self.roll = roll_val
         self.pitch = pitch_val
         self.yaw = yaw_val
         
-        # Update the display and visualization on the main thread
+        # Update the text display on the main thread
         Clock.schedule_once(lambda dt: self.update_orientation_display())
-        Clock.schedule_once(lambda dt: self.visualizer.set_orientation(self.roll, self.pitch, self.yaw))
 
     def on_unknown_command(self, command_id):
         """Called when unknown command ID is received"""
