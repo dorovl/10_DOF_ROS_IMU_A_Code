@@ -49,16 +49,16 @@ def init():
 def drawText(position, textString):
     """Draw text on the OpenGL screen"""
     font = pygame.font.SysFont ("Courier", 18, True)
-    textSurface = font.render(textString, True, (255,255,255,255), (0,0,0,255))     
-    textData = pygame.image.tostring(textSurface, "RGBA", True)     
-    glRasterPos3d(*position)     
+    textSurface = font.render(textString, True, (255,255,255,255), (0,0,0,255))
+    textData = pygame.image.tostring(textSurface, "RGBA", True)
+    glRasterPos3d(*position)
     glDrawPixels(textSurface.get_width(), textSurface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, textData)
 
 def draw():
     """Render the 3D IMU visualization"""
     global rquad
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
-    
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     glLoadIdentity()
     glTranslatef(0,0.0,-7.0)
 
@@ -67,50 +67,50 @@ def draw():
     osd_line = osd_text + ", yaw: " + str("{0:.2f}".format(yaw))
     drawText((-2,-2, 2), osd_line)
 
-    # the way I'm holding the IMU board, X and Y axis are switched 
+    # the way I'm holding the IMU board, X and Y axis are switched
     # with respect to the OpenGL coordinate system
     glRotatef(yaw, 0.0, 1.0, 0.0)  # Yaw,   rotate around y-axis
     glRotatef(-1*pitch ,1.0,0.0,0.0)        # Pitch, rotate around x-axis
     glRotatef(-1*roll ,0.0,0.0,1.0)     # Roll,  rotate around z-axis
 
     # Draw a colored box representing the IMU board
-    glBegin(GL_QUADS)	
+    glBegin(GL_QUADS)
     glColor3f(0.0,1.0,0.0)
     glVertex3f( 1.0, 0.2,-1.0)
-    glVertex3f(-1.0, 0.2,-1.0)		
-    glVertex3f(-1.0, 0.2, 1.0)		
-    glVertex3f( 1.0, 0.2, 1.0)		
-
-    glColor3f(1.0,0.5,0.0)	
-    glVertex3f( 1.0,-0.2, 1.0)
-    glVertex3f(-1.0,-0.2, 1.0)		
-    glVertex3f(-1.0,-0.2,-1.0)		
-    glVertex3f( 1.0,-0.2,-1.0)		
-
-    glColor3f(1.0,0.0,0.0)		
+    glVertex3f(-1.0, 0.2,-1.0)
+    glVertex3f(-1.0, 0.2, 1.0)
     glVertex3f( 1.0, 0.2, 1.0)
-    glVertex3f(-1.0, 0.2, 1.0)		
-    glVertex3f(-1.0,-0.2, 1.0)		
-    glVertex3f( 1.0,-0.2, 1.0)		
 
-    glColor3f(1.0,1.0,0.0)	
+    glColor3f(1.0,0.5,0.0)
+    glVertex3f( 1.0,-0.2, 1.0)
+    glVertex3f(-1.0,-0.2, 1.0)
+    glVertex3f(-1.0,-0.2,-1.0)
+    glVertex3f( 1.0,-0.2,-1.0)
+
+    glColor3f(1.0,0.0,0.0)
+    glVertex3f( 1.0, 0.2, 1.0)
+    glVertex3f(-1.0, 0.2, 1.0)
+    glVertex3f(-1.0,-0.2, 1.0)
+    glVertex3f( 1.0,-0.2, 1.0)
+
+    glColor3f(1.0,1.0,0.0)
     glVertex3f( 1.0,-0.2,-1.0)
     glVertex3f(-1.0,-0.2,-1.0)
-    glVertex3f(-1.0, 0.2,-1.0)		
-    glVertex3f( 1.0, 0.2,-1.0)		
+    glVertex3f(-1.0, 0.2,-1.0)
+    glVertex3f( 1.0, 0.2,-1.0)
 
-    glColor3f(0.0,0.0,1.0)	
+    glColor3f(0.0,0.0,1.0)
     glVertex3f(-1.0, 0.2, 1.0)
-    glVertex3f(-1.0, 0.2,-1.0)		
-    glVertex3f(-1.0,-0.2,-1.0)		
-    glVertex3f(-1.0,-0.2, 1.0)		
+    glVertex3f(-1.0, 0.2,-1.0)
+    glVertex3f(-1.0,-0.2,-1.0)
+    glVertex3f(-1.0,-0.2, 1.0)
 
-    glColor3f(1.0,0.0,1.0)	
+    glColor3f(1.0,0.0,1.0)
     glVertex3f( 1.0, 0.2,-1.0)
     glVertex3f( 1.0, 0.2, 1.0)
-    glVertex3f( 1.0,-0.2, 1.0)		
-    glVertex3f( 1.0,-0.2,-1.0)		
-    glEnd()	
+    glVertex3f( 1.0,-0.2, 1.0)
+    glVertex3f( 1.0,-0.2,-1.0)
+    glEnd()
 
 # ========== IMU Data Callbacks ==========
 # These callbacks are invoked by the imu_parser when data is received
@@ -164,18 +164,18 @@ def on_quaternion(w, x, y, z):
 def on_euler_angles(roll_val, pitch_val, yaw_val):
     """Called when Euler angle data is received - updates visualization"""
     global roll, pitch, yaw
-    
+
     print("\tangleX: %.3f"%roll_val);   # Euler angle x (roll)
     print("\tangleY: %.3f"%pitch_val);  # Euler angle y (pitch)
     print("\tangleZ: %.3f"%yaw_val);    # Euler angle z (yaw)
-    
+
     # Update global orientation variables
     roll = roll_val
     pitch = pitch_val
     yaw = yaw_val
 
     # Redraw the 3D visualization
-    draw() 
+    draw()
     pygame.display.flip()
 
 def on_unknown_command(command_id):
@@ -217,7 +217,7 @@ def imu_gui():
     params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
     params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
     params[9] = Cmd_ReportTag&0xff
-    params[10] = (Cmd_ReportTag>>8)&0xff    
+    params[10] = (Cmd_ReportTag>>8)&0xff
     Cmd_PackAndTx(params, len(params), ser.write) # Send commands to sensors
     time.sleep(0.2)
 
@@ -236,8 +236,8 @@ def imu_gui():
         event = pygame.event.poll()
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
             pygame.quit()  #* quit pygame properly
-            break 
-                
+            break
+
         data = ser.read(1) # read 1 bytes
         if len(data) > 0: # if data is not empty
             Cmd_GetPkt(data[0], callbacks=imu_callbacks)

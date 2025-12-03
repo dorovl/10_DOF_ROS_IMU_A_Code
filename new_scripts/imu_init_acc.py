@@ -95,12 +95,12 @@ def main():
     """Main accelerometer calibration function"""
     global faces_collected
     faces_collected = 0
-    
+
     with serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout) as ser:
         print("=== Starting Accelerometer Calibration ===")
         print("Place the sensor on first face and keep it still. Once prompted for, change the face.")
         print("Note: The LED will pause briefly when each face is collected.")
-        
+
         # Parameter settings
         isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
         barometerFilter = 2

@@ -29,7 +29,7 @@ scaleHeight      = 0.0010728836       # Height scale factor
 def Cmd_RxUnpack(buf, DLen, callbacks=None):
     """
     Parse IMU data packet and invoke callbacks for different data types.
-    
+
     Args:
         buf: Data buffer containing the packet data body
         DLen: Data length
@@ -82,7 +82,7 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
         if 'reporting_disabled_ack' in callbacks:
             callbacks['reporting_disabled_ack']()
         return
-    
+
     # Handle proactive reporting enabled acknowledgment (0x19)
     if buf[0] == 0x19:
         if 'reporting_enabled_ack' in callbacks:
@@ -127,25 +127,25 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
         # Parse packet header
         ctl = (buf[2] << 8) | buf[1]  # Control/subscription tag
         timestamp_ms = ((buf[6]<<24) | (buf[5]<<16) | (buf[4]<<8) | (buf[3]<<0))  # Timestamp in milliseconds
-        
+
         # Notify about packet header
         if 'packet_header' in callbacks:
             callbacks['packet_header'](ctl, timestamp_ms)
 
         L = 7  # Starting from the 7th byte, the remaining data is parsed according to the subscription identification tag.
-        
+
         # Parse acceleration data without gravity (0x0001)
-        if ((ctl & 0x0001) != 0):  
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+        if ((ctl & 0x0001) != 0):
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # Acceleration ax without gravity
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # Acceleration ay without gravity
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # Acceleration az without gravity
-            
+
             if 'accel_no_gravity' in callbacks:
                 callbacks['accel_no_gravity'](tmpX, tmpY, tmpZ)
-                    
+
         # Parse acceleration data with gravity (0x0002)
         if ((ctl & 0x0002) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
@@ -154,26 +154,26 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             # Acceleration AY with gravity
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAccel; L += 2
             # Acceleration AZ with gravity
-            
+
             # Calculate acceleration magnitude (absolute value of 3-axis composite)
             tmpAbs = np.sqrt(tmpX*tmpX + tmpY*tmpY + tmpZ*tmpZ)
             # Acceleration module
-            
+
             if 'accel_with_gravity' in callbacks:
                 callbacks['accel_with_gravity'](tmpX, tmpY, tmpZ, tmpAbs)
 
         # Parse gyroscope data (0x0004)
         if ((ctl & 0x0004) != 0):
-            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # Angular velocity GX
-            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+            tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # Angular velocity GY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
             # Angular velocity GZ
-            
+
             if 'gyroscope' in callbacks:
                 callbacks['gyroscope'](tmpX, tmpY, tmpZ)
-        
+
         # Parse magnetometer data (0x0008)
         if ((ctl & 0x0008) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
@@ -182,14 +182,14 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             # Magnetic field data CY
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleMag; L += 2
             # Magnetic field data CZ
-            
+
             # Calculate magnetometer magnitude (absolute value of 3-axis composite)
             tmpAbs = math.sqrt(math.pow(tmpX, 2) + math.pow(tmpY, 2) + math.pow(tmpZ, 2))
             # Absolute value of 3-axis composite
-            
+
             if 'magnetometer' in callbacks:
                 callbacks['magnetometer'](tmpX, tmpY, tmpZ, tmpAbs)
-        
+
         # Parse environmental data: temperature, air pressure, height (0x0010)
         if ((ctl & 0x0010) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleTemperature; L += 2
@@ -199,7 +199,7 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             tmpU32 = np.uint32(((np.uint32(buf[L+2]) << 16) | (np.uint32(buf[L+1]) << 8) | np.uint32(buf[L])))
             # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
             if ((tmpU32 & 0x800000) == 0x800000):
-                tmpU32 = (tmpU32 | 0xff000000)      
+                tmpU32 = (tmpU32 | 0xff000000)
             tmpY = np.int32(tmpU32) * scaleAirPressure; L += 3
             # air pressure
 
@@ -208,9 +208,9 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             # If the highest bit of the 24-digit number is 1, the value is a negative number and needs to be converted to a 32-bit negative number, just add ff directly.
             if ((tmpU32 & 0x800000) == 0x800000):
                 tmpU32 = (tmpU32 | 0xff000000)
-            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3 
+            tmpZ = np.int32(tmpU32) * scaleHeight; L += 3
             # high
-            
+
             if 'environmental' in callbacks:
                 callbacks['environmental'](tmpX, tmpY, tmpZ)
 
@@ -224,7 +224,7 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             # Quaternion y
             tmpZ =   np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleQuat; L += 2
             # Quaternion z
-            
+
             if 'quaternion' in callbacks:
                 callbacks['quaternion'](tmpAbs, tmpX, tmpY, tmpZ)
 
@@ -236,7 +236,7 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
             # Euler angle y (pitch)
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # Euler angle z (yaw)
-            
+
             if 'euler_angles' in callbacks:
                 callbacks['euler_angles'](tmpX, tmpY, tmpZ)
 
@@ -250,18 +250,18 @@ def Cmd_GetPkt(byte, callbacks=None):
     """
     State machine for parsing incoming serial data packets byte-by-byte.
     Call this function for each byte received from the serial port.
-    
+
     Args:
         byte: Single byte received from serial port
         callbacks: Dictionary of callbacks to pass to Cmd_RxUnpack when packet is complete
-        
+
     Returns:
         1 when a complete packet is received and processed, 0 otherwise
     """
     global _CS, _i, _RxIndex, _buf, _cmdLen
-    
+
     _CS += byte # Calculate the check code while receiving the data. The check code is the sum of the data from the beginning of the address code (including the address code) to before the check code.
-    
+
     if _RxIndex == 0: # Start code
         if byte == CmdPacket_Begin:
             _i = 0
@@ -269,7 +269,7 @@ def Cmd_GetPkt(byte, callbacks=None):
             _i += 1
             _CS = 0 # Calculate the check code starting from the next byte
             _RxIndex = 1
-            
+
     elif _RxIndex == 1: # The address code of the data body
         _buf[_i] = byte
         _i += 1
@@ -277,7 +277,7 @@ def Cmd_GetPkt(byte, callbacks=None):
             _RxIndex = 0
         else:
             _RxIndex += 1
-            
+
     elif _RxIndex == 2: # The length of the data body
         _buf[_i] = byte
         _i += 1
@@ -286,13 +286,13 @@ def Cmd_GetPkt(byte, callbacks=None):
         else:
             _RxIndex += 1
             _cmdLen = byte
-            
+
     elif _RxIndex == 3: # Get the data of the data body
         _buf[_i] = byte
         _i += 1
         if _i >= _cmdLen + 3: # Data body has been received
             _RxIndex += 1
-            
+
     elif _RxIndex == 4: # Compare verification code
         _CS -= byte
         if (_CS&0xFF) == byte: # Verification is correct
@@ -301,36 +301,36 @@ def Cmd_GetPkt(byte, callbacks=None):
             _RxIndex += 1
         else: # Verification failed
             _RxIndex = 0
-            
+
     elif _RxIndex == 5: # end code
         _RxIndex = 0
         if byte == CmdPacket_End: # Get the complete package
             _buf[_i] = byte
             _i += 1
             hex_string = " ".join(f"{b:02X}" for b in _buf[0:_i])
-            
+
             # Call packet_received callback if provided
             if callbacks and 'packet_received' in callbacks:
                 callbacks['packet_received'](hex_string, _i)
-            
+
             # Process the data body of the packet
             Cmd_RxUnpack(_buf[3:_i-2], _i-5, callbacks=callbacks)
             return 1
     else:
         _RxIndex = 0
-        
+
     return 0
 
 
 def Cmd_PackAndTx(pDat, DLen, serial_write_func):
     """
     Build and transmit a command packet to the IMU sensor.
-    
+
     Args:
         pDat: Data bytes to send
         DLen: Length of data
         serial_write_func: Function to call to write bytes to serial port (e.g., ser.write)
-        
+
     Returns:
         0 on success, -1 on error
     """
