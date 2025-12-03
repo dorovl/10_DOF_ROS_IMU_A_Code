@@ -36,13 +36,6 @@ class IMU3DVisualizer(Widget):
         self.bind(pos=self.update_canvas, size=self.update_canvas)
         self.update_canvas()
     
-    def set_orientation(self, roll, pitch, yaw):
-        """Update the orientation angles (kept for compatibility)"""
-        self.roll = roll
-        self.pitch = pitch
-        self.yaw = yaw
-        # Not used for visualization anymore - quaternions are used instead
-    
     def set_quaternion(self, w, x, y, z):
         """Update orientation using quaternion (avoids gimbal lock!)"""
         self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, z, y
