@@ -1,13 +1,11 @@
 import asyncio
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
-from kivy.graphics import Color, Rectangle, Rotate, PushMatrix, PopMatrix, Translate
-from kivy.graphics.opengl import glEnable, glDisable, GL_DEPTH_TEST
+from kivy.graphics import Color, Quad
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 import math
@@ -40,63 +38,107 @@ class IMU3DVisualizer(Widget):
         self.yaw = yaw
         self.update_canvas()
     
+    def _rotate_point(self, x, y, z, roll, pitch, yaw):
+        """Apply rotation transformations to a 3D point matching OpenGL order"""
+        # Convert to radians
+        roll_rad = math.radians(roll)
+        pitch_rad = math.radians(pitch)
+        yaw_rad = math.radians(yaw)
+        
+        # Apply rotations in OpenGL order: yaw (Y-axis), pitch (X-axis), roll (Z-axis)
+        # Rotation around Y-axis (yaw)
+        x1 = x * math.cos(yaw_rad) + z * math.sin(yaw_rad)
+        z1 = -x * math.sin(yaw_rad) + z * math.cos(yaw_rad)
+        y1 = y
+        
+        # Rotation around X-axis (pitch)
+        y2 = y1 * math.cos(pitch_rad) - z1 * math.sin(pitch_rad)
+        z2 = y1 * math.sin(pitch_rad) + z1 * math.cos(pitch_rad)
+        x2 = x1
+        
+        # Rotation around Z-axis (roll)
+        x3 = x2 * math.cos(roll_rad) - y2 * math.sin(roll_rad)
+        y3 = x2 * math.sin(roll_rad) + y2 * math.cos(roll_rad)
+        z3 = z2
+        
+        return x3, y3, z3
+    
+    def _project_3d_to_2d(self, x, y, z, scale, cx, cy):
+        """Simple orthographic projection - no perspective"""
+        screen_x = cx + x * scale
+        screen_y = cy + y * scale
+        return screen_x, screen_y, z
+    
     def update_canvas(self, *args):
         """Redraw the 3D visualization"""
+        from kivy.graphics import Quad
+        
         self.canvas.clear()
         
+        # Center and scale - make it MUCH larger
+        cx = self.center_x
+        cy = self.center_y
+        scale = min(self.width, self.height) / 2.5  # Much larger!
+        
+        # Define box vertices (matching OpenGL version proportions)
+        # Width=2.0, Height=0.4, Depth=2.0 (like the OpenGL version)
+        vertices = [
+            # Top face
+            ( 1.0,  0.2, -1.0), (-1.0,  0.2, -1.0), (-1.0,  0.2,  1.0), ( 1.0,  0.2,  1.0),
+            # Bottom face  
+            ( 1.0, -0.2,  1.0), (-1.0, -0.2,  1.0), (-1.0, -0.2, -1.0), ( 1.0, -0.2, -1.0),
+            # Front face
+            ( 1.0,  0.2,  1.0), (-1.0,  0.2,  1.0), (-1.0, -0.2,  1.0), ( 1.0, -0.2,  1.0),
+            # Back face
+            ( 1.0, -0.2, -1.0), (-1.0, -0.2, -1.0), (-1.0,  0.2, -1.0), ( 1.0,  0.2, -1.0),
+            # Left face
+            (-1.0,  0.2,  1.0), (-1.0,  0.2, -1.0), (-1.0, -0.2, -1.0), (-1.0, -0.2,  1.0),
+            # Right face
+            ( 1.0,  0.2, -1.0), ( 1.0,  0.2,  1.0), ( 1.0, -0.2,  1.0), ( 1.0, -0.2, -1.0),
+        ]
+        
+        # Face colors (matching OpenGL version)
+        colors = [
+            (0.0, 1.0, 0.0),  # Top - green
+            (1.0, 0.5, 0.0),  # Bottom - orange
+            (1.0, 0.0, 0.0),  # Front - red
+            (1.0, 1.0, 0.0),  # Back - yellow
+            (0.0, 0.0, 1.0),  # Left - blue
+            (1.0, 0.0, 1.0),  # Right - magenta
+        ]
+        
+        # Rotate and project all vertices
+        projected_faces = []
+        for face_idx in range(6):
+            face_vertices = []
+            for vert_idx in range(4):
+                v = vertices[face_idx * 4 + vert_idx]
+                # Apply rotations matching OpenGL: yaw, -pitch, -roll
+                rx, ry, rz = self._rotate_point(v[0], v[1], v[2], -self.roll, -self.pitch, self.yaw)
+                # Project to 2D
+                px, py, pz = self._project_3d_to_2d(rx, ry, rz, scale, cx, cy)
+                face_vertices.append((px, py, pz))
+            
+            # Calculate average Z for depth sorting
+            avg_z = sum(v[2] for v in face_vertices) / 4
+            projected_faces.append((avg_z, face_idx, face_vertices))
+        
+        # Sort faces by Z (back to front)
+        projected_faces.sort(key=lambda f: f[0])
+        
+        # Draw faces back to front
         with self.canvas:
-            # Enable depth testing for 3D effect
-            PushMatrix()
-            
-            # Center the visualization
-            cx = self.center_x
-            cy = self.center_y
-            
-            # Scale for the IMU box
-            scale = min(self.width, self.height) / 8
-            
-            # Apply transformations: translate to center
-            Translate(cx, cy, 0)
-            
-            # Apply rotations (order matters: yaw, pitch, roll)
-            Rotate(angle=self.yaw, axis=(0, 0, 1))      # Yaw around Z
-            Rotate(angle=-self.pitch, axis=(1, 0, 0))   # Pitch around X
-            Rotate(angle=-self.roll, axis=(0, 1, 0))    # Roll around Y
-            
-            # Draw the IMU box with 6 colored faces
-            self._draw_box(scale)
-            
-            PopMatrix()
-    
-    def _draw_box(self, scale):
-        """Draw a colored 3D box representing the IMU"""
-        w = scale * 2
-        h = scale * 0.4
-        d = scale * 1.5
-        
-        # Top face (green)
-        Color(0.0, 1.0, 0.0, 1.0)
-        Rectangle(pos=(-w/2, h/2), size=(w, d))
-        
-        # Bottom face (orange)
-        Color(1.0, 0.5, 0.0, 1.0)
-        Rectangle(pos=(-w/2, -h/2 - d), size=(w, d))
-        
-        # Front face (red)
-        Color(1.0, 0.0, 0.0, 1.0)
-        Rectangle(pos=(-w/2, -h/2), size=(w, h))
-        
-        # Back face (yellow)
-        Color(1.0, 1.0, 0.0, 1.0)
-        Rectangle(pos=(-w/2, h/2), size=(w, h))
-        
-        # Left face (blue)
-        Color(0.0, 0.0, 1.0, 1.0)
-        Rectangle(pos=(-w/2, -h/2), size=(d * 0.3, h))
-        
-        # Right face (magenta)
-        Color(1.0, 0.0, 1.0, 1.0)
-        Rectangle(pos=(w/2 - d * 0.3, -h/2), size=(d * 0.3, h))
+            for avg_z, face_idx, face_verts in projected_faces:
+                color = colors[face_idx]
+                Color(color[0], color[1], color[2], 1.0)
+                
+                # Draw as a quad
+                Quad(points=[
+                    face_verts[0][0], face_verts[0][1],
+                    face_verts[1][0], face_verts[1][1],
+                    face_verts[2][0], face_verts[2][1],
+                    face_verts[3][0], face_verts[3][1],
+                ])
 
 
 class BLEWidget(BoxLayout):
