@@ -36,11 +36,40 @@ class IMU3DVisualizer(Widget):
         self.bind(pos=self.update_canvas, size=self.update_canvas)
         self.update_canvas()
     
+    def set_orientation(self, roll, pitch, yaw):
+        """Update the orientation angles (kept for compatibility)"""
+        self.roll = roll
+        self.pitch = pitch
+        self.yaw = yaw
+        # Not used for visualization anymore - quaternions are used instead
+    
     def set_quaternion(self, w, x, y, z):
         """Update orientation using quaternion (avoids gimbal lock!)"""
-        # Correct IMU to OpenGL coordinate system mapping
-        # This makes yaw, pitch, and roll all rotate correctly
+        # Test different mappings - uncomment ONE line at a time:
+        
+        # Current (works for yaw, wrong roll/pitch sense):
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, y, x
+        
+        # Your suggestion (yaw good, pitch/roll flipped):
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, z, -y
+        
+        # Try negating different axes:
         self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, z, y
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, -z, y
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, x, z, y
+        
+        # Try other swaps:
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, x, z
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, x, y
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, z, y, x
+        
+        # Try with negations:
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -y, -z, x
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, -z, -x
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, -z, -y
+        
+        # Conjugate (invert all):
+        #self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, -y, -z
         
         self.update_canvas()
     
