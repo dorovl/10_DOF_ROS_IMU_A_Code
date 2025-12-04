@@ -156,7 +156,7 @@ async def main():
         par_device_addr, cb=dict(use_bdaddr=False)  # use_bdaddr determines whether it is MAC system
     )
     if device is None:
-        print("could not find device with address '%s'", par_device_addr)
+        print(f"could not find device with address '{par_device_addr}'")
         return
 
     # event definition
