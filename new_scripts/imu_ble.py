@@ -149,61 +149,71 @@ def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearra
     Cmd_RxUnpack(data, len(data), callbacks=imu_callbacks)
 
 async def main():
-    print("starting scan...")
+    print("Starting scan...")
 
-    # Find devices based on MAC address
-    device = await BleakScanner.find_device_by_address(
-        par_device_addr, cb=dict(use_bdaddr=False)  # use_bdaddr determines whether it is MAC system
-    )
+    device = None
+    devices = await BleakScanner.discover(timeout=10.0)
+    for d in devices:
+        if d.address == par_device_addr:
+            device = d
+            break
+    
     if device is None:
         print(f"could not find device with address '{par_device_addr}'")
         return
 
-    # event definition
+    print(f"Found: {device.name}")
+
     disconnected_event = asyncio.Event()
 
-    # Disconnect event callback
     def disconnected_callback(client):
         print("Disconnected callback called!")
         disconnected_event.set()
 
-    print("connecting to device...")
-    async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
-        print("Connected")
+    for attempt in range(5):
+        try:
+            print(f"connecting to device... (attempt {attempt + 1})")
+            async with BleakClient(device, disconnected_callback=disconnected_callback) as client:
+                print("Connected")
 
-        # Start notifications
-        await client.start_notify(par_notification_characteristic, notification_handler)
-        # stay connected 0x29
-        await client.write_gatt_char(par_write_characteristic, bytes([0x29]))
-        # Try to use Bluetooth high-speed communication features 0x46
-        await client.write_gatt_char(par_write_characteristic, bytes([0x46]))
+                # Start notifications
+                await client.start_notify(par_notification_characteristic, notification_handler)
+                # stay connected 0x29
+                await client.write_gatt_char(par_write_characteristic, bytes([0x29]))
+                # Try to use Bluetooth high-speed communication features 0x46
+                await client.write_gatt_char(par_write_characteristic, bytes([0x46]))
 
-        # Parameter settings
-        isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
-        barometerFilter = 2
-        Cmd_ReportTag = 0x7F # Feature subscription tag
-        params = bytearray([0x00 for i in range(0,11)])
-        params[0] = 0x12
-        params[1] = 5       #Stationary state acceleration threshold
-        params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
-        params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
-        params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1)
-        params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
-        params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
-        params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
-        params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
-        params[9] = Cmd_ReportTag&0xff
-        params[10] = (Cmd_ReportTag>>8)&0xff
-        await client.write_gatt_char(par_write_characteristic, params)
+                # Parameter settings
+                isCompassOn = 0 #Whether to use magnetic field fusion 0: Not used 1: Used
+                barometerFilter = 2
+                Cmd_ReportTag = 0x7F # Feature subscription tag
+                params = bytearray([0x00 for i in range(0,11)])
+                params[0] = 0x12
+                params[1] = 5       #Stationary state acceleration threshold
+                params[2] = 255     #Static zero return speed (unit cm/s) 0: No return to zero 255: Return to zero immediately
+                params[3] = 0       #Dynamic zero return speed (unit cm/s) 0: No return to zero
+                params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1)
+                params[5] = 60      #The transmission frame rate of data actively reported [value 0-250HZ], 0 means 0.5HZ
+                params[6] = 1       #Gyroscope filter coefficient [value 0-2], the larger the value, the more stable it is but the worse the real-time performance.
+                params[7] = 3       #Accelerometer filter coefficient [value 0-4], the larger the value, the more stable it is but the worse the real-time performance.
+                params[8] = 5       #Magnetometer filter coefficient [value 0-9], the larger the value, the more stable it is but the worse the real-time performance.
+                params[9] = Cmd_ReportTag&0xff
+                params[10] = (Cmd_ReportTag>>8)&0xff
+                await client.write_gatt_char(par_write_characteristic, params)
 
-        # Enable proactive reporting
-        await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
+                # Enable proactive reporting
+                await client.write_gatt_char(par_write_characteristic, bytes([0x19]))
 
-        # Add a loop so that the program does not exit while receiving data
-        while not disconnected_event.is_set():
-            await asyncio.sleep(1.0)
+                # Add a loop so that the program does not exit while receiving data
+                while not disconnected_event.is_set():
+                    await asyncio.sleep(1.0)
 
-        # await disconnected_event.wait() # Sleep until device disconnects, with delay. Here is the listening device until disconnected
-        # await client.stop_notify(par_notification_characteristic)
+                # await disconnected_event.wait() # Sleep until device disconnects, with delay. Here is the listening device until disconnected
+                # await client.stop_notify(par_notification_characteristic)
+        except Exception as e:
+                print(f"Connection failed: {e}")
+                await asyncio.sleep(3)
+    else:
+        print("Failed to connect after 5 attempts")
 
 asyncio.run(main())
