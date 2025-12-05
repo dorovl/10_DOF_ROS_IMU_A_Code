@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-IMU 3D Visualization over TCP/IP
-Connects to ESP32 TCP server and visualizes orientation using quaternions.
-"""
-
 import socket
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -75,8 +69,8 @@ def draw():
     glLoadIdentity()
     glTranslatef(0, 0.0, -7.0)
 
-    # Display Euler angles (same position and order as original)
-    osd = f"pitch: {pitch:.2f}, roll: {roll:.2f}, yaw: {yaw:.2f}"
+    # Display Euler angles (standard RPY order)
+    osd = f"roll: {roll:.2f}, pitch: {pitch:.2f}, yaw: {yaw:.2f}"
     draw_text((-1, -2, 2), osd)
 
     # Apply quaternion rotation

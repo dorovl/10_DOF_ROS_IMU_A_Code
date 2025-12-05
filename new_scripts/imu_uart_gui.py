@@ -87,9 +87,8 @@ def draw():
     glLoadIdentity()
     glTranslatef(0,0.0,-7.0)
 
-    # Display orientation values as text (Euler angles for readability)
-    osd_text = "pitch: " + str("{0:.2f}".format(pitch)) + ", roll: " + str("{0:.2f}".format(roll))
-    osd_line = osd_text + ", yaw: " + str("{0:.2f}".format(yaw))
+    # Display orientation values as text (standard RPY order)
+    osd_line = f"roll: {roll:.2f}, pitch: {pitch:.2f}, yaw: {yaw:.2f}"
     drawText((-1,-2, 2), osd_line)
 
     # Apply quaternion rotation using rotation matrix (no gimbal lock!)

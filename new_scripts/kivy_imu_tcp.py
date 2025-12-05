@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-IMU 3D Visualization over TCP/IP using Kivy
-Connects to ESP32 TCP server and visualizes orientation using quaternions.
-"""
-
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -132,9 +126,9 @@ class TCPWidget(BoxLayout):
         )
         self.add_widget(self.status_label)
         
-        # Orientation display (matching PyGame format)
+        # Orientation display (standard RPY order)
         self.orientation_label = Label(
-            text="pitch: 0.00, roll: 0.00, yaw: 0.00",
+            text="roll: 0.00, pitch: 0.00, yaw: 0.00",
             size_hint=(1, 0.1),
             color=(0.5, 1, 0.5, 1)
         )
@@ -157,7 +151,7 @@ class TCPWidget(BoxLayout):
         Clock.schedule_once(lambda dt: setattr(self.status_label, 'text', text))
 
     def update_orientation_display(self):
-        text = f"pitch: {self.pitch:.2f}, roll: {self.roll:.2f}, yaw: {self.yaw:.2f}"
+        text = f"roll: {self.roll:.2f}, pitch: {self.pitch:.2f}, yaw: {self.yaw:.2f}"
         Clock.schedule_once(lambda dt: setattr(self.orientation_label, 'text', text))
 
     def parse_imu_line(self, line):

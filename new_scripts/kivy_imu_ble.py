@@ -174,9 +174,9 @@ class BLEWidget(BoxLayout):
         )
         self.add_widget(self.status_label)
         
-        # Orientation values display
+        # Orientation values display (standard RPY order)
         self.orientation_label = Label(
-            text="Roll: 0.00° | Pitch: 0.00° | Yaw: 0.00°",
+            text="roll: 0.00, pitch: 0.00, yaw: 0.00",
             size_hint=(1, 0.1),
             color=(0.5, 1, 0.5, 1)
         )
@@ -215,8 +215,8 @@ class BLEWidget(BoxLayout):
         Clock.schedule_once(lambda dt: setattr(self.status_label, 'text', text))
 
     def update_orientation_display(self):
-        """Update the orientation values display"""
-        text = f"Roll: {self.roll:.2f}° | Pitch: {self.pitch:.2f}° | Yaw: {self.yaw:.2f}°"
+        """Update the orientation values display (standard RPY order)"""
+        text = f"roll: {self.roll:.2f}, pitch: {self.pitch:.2f}, yaw: {self.yaw:.2f}"
         Clock.schedule_once(lambda dt: setattr(self.orientation_label, 'text', text))
 
     # ========== IMU Data Callbacks (called by imu_parser) ==========
