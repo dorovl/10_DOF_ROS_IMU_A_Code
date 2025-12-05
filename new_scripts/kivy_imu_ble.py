@@ -44,7 +44,7 @@ class IMU3DVisualizer(Widget):
         """Update orientation using quaternion (avoids gimbal lock!)"""
         # Correct IMU to OpenGL coordinate system mapping
         # This makes yaw, pitch, and roll all rotate correctly
-        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -y, z, -x
+        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, z, x
         
         self.update_canvas()
     

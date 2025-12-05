@@ -139,9 +139,9 @@ def parse_imu_line(line):
         
         # Apply axis remapping (matching original: w, -x, z, y)
         quat_w = w
-        quat_x = -x
+        quat_x = y
         quat_y = z
-        quat_z = y
+        quat_z = x
         
         # Euler angles at indices 17-19 (roll, pitch, yaw)
         roll = float(parts[17])

@@ -156,9 +156,9 @@ def on_quaternion(w, x, y, z):
     
     # Apply axis remapping (same as Kivy app: w, -x, z, y)
     quat_w = w
-    quat_x = -y
+    quat_x = y
     quat_y = z
-    quat_z = -x
+    quat_z = x
     
     # Redraw the 3D visualization
     draw()
