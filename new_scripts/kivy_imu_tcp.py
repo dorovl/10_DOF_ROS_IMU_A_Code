@@ -28,7 +28,7 @@ class IMU3DVisualizer(Widget):
     def set_quaternion(self, w, x, y, z):
         """Update orientation using quaternion (avoids gimbal lock!)"""
         # Correct IMU to OpenGL coordinate system mapping
-        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -x, z, y
+        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, -y, z, -x
         self.update_canvas()
     
     def _rotate_point_quat(self, x, y, z):

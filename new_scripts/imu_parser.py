@@ -245,14 +245,14 @@ def Cmd_RxUnpack(buf, DLen, callbacks=None):
         # Parse Euler angles (0x0040)
         if ((ctl & 0x0040) != 0):
             tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # Euler angle x (pitch)
+            # Euler angle x (roll)
             tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-            # Euler angle y (roll)
+            # Euler angle y (pitch)
             tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
             # Euler angle z (yaw)
 
             if 'euler_angles' in callbacks:
-                callbacks['euler_angles'](tmpY, tmpX, tmpZ)
+                callbacks['euler_angles'](tmpX, tmpY, tmpZ)
 
     else:
         # Unknown command ID
