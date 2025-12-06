@@ -7,7 +7,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
-from kivy.graphics import Color, Quad
+from kivy.graphics import Color, Mesh
 
 # TCP connection settings
 TCP_HOST = "192.168.0.105"  # ESP32 IP address - adjust as needed
@@ -24,17 +24,52 @@ class IMU3DVisualizer(Widget):
         self.quat_y = 0.0
         self.quat_z = 0.0
         self.bind(pos=self.update_canvas, size=self.update_canvas)
+        
+        # Define faces with outward-facing normals (CCW winding when viewed from outside)
+        # Each face: [v0, v1, v2, v3] in CCW order when looking at the face from outside
+        self.faces = [
+            # Top (Y+) - green
+            (( 1.0,  0.2,  1.0), (-1.0,  0.2,  1.0), (-1.0,  0.2, -1.0), ( 1.0,  0.2, -1.0)),
+            # Bottom (Y-) - orange  
+            (( 1.0, -0.2, -1.0), (-1.0, -0.2, -1.0), (-1.0, -0.2,  1.0), ( 1.0, -0.2,  1.0)),
+            # Front (Z+) - red
+            (( 1.0,  0.2,  1.0), ( 1.0, -0.2,  1.0), (-1.0, -0.2,  1.0), (-1.0,  0.2,  1.0)),
+            # Back (Z-) - yellow
+            ((-1.0,  0.2, -1.0), (-1.0, -0.2, -1.0), ( 1.0, -0.2, -1.0), ( 1.0,  0.2, -1.0)),
+            # Left (X-) - blue
+            ((-1.0,  0.2,  1.0), (-1.0, -0.2,  1.0), (-1.0, -0.2, -1.0), (-1.0,  0.2, -1.0)),
+            # Right (X+) - magenta
+            (( 1.0,  0.2, -1.0), ( 1.0, -0.2, -1.0), ( 1.0, -0.2,  1.0), ( 1.0,  0.2,  1.0)),
+        ]
+        
+        self.colors = [
+            (0.0, 1.0, 0.0),  # Top - green
+            (1.0, 0.5, 0.0),  # Bottom - orange
+            (1.0, 0.0, 0.0),  # Front - red
+            (1.0, 1.0, 0.0),  # Back - yellow
+            (0.0, 0.0, 1.0),  # Left - blue
+            (1.0, 0.0, 1.0),  # Right - magenta
+        ]
+        
         self.update_canvas()
     
     def set_quaternion(self, w, x, y, z):
-        """Update orientation using quaternion (avoids gimbal lock!)"""
-        # Correct IMU to OpenGL coordinate system mapping
-        self.quat_w, self.quat_x, self.quat_y, self.quat_z = w, y, z, x
+        """Update orientation using quaternion"""
+        # Apply axis remapping (matching PyGame version: w, y, z, x)
+        self.quat_w = w
+        self.quat_x = y
+        self.quat_y = z
+        self.quat_z = x
         self.update_canvas()
     
     def _rotate_point_quat(self, x, y, z):
-        """Rotate point using quaternion (no gimbal lock!)"""
+        """Rotate point using quaternion"""
         w, qx, qy, qz = self.quat_w, self.quat_x, self.quat_y, self.quat_z
+        
+        # Normalize quaternion
+        norm = (w*w + qx*qx + qy*qy + qz*qz) ** 0.5
+        if norm > 0:
+            w, qx, qy, qz = w/norm, qx/norm, qy/norm, qz/norm
         
         # Quaternion rotation formula: v' = v + 2*q.xyz × (q.xyz × v + q.w*v)
         cx1 = qy * z - qz * y
@@ -51,6 +86,19 @@ class IMU3DVisualizer(Widget):
         
         return x + 2.0 * cx2, y + 2.0 * cy2, z + 2.0 * cz2
     
+    def _compute_normal(self, v0, v1, v2):
+        """Compute face normal from three vertices using cross product"""
+        # Edge vectors
+        e1 = (v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2])
+        e2 = (v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2])
+        
+        # Cross product
+        nx = e1[1] * e2[2] - e1[2] * e2[1]
+        ny = e1[2] * e2[0] - e1[0] * e2[2]
+        nz = e1[0] * e2[1] - e1[1] * e2[0]
+        
+        return nx, ny, nz
+    
     def _project_3d_to_2d(self, x, y, z, scale, cx, cy):
         """Simple orthographic projection"""
         return cx + x * scale, cy + y * scale, z
@@ -63,48 +111,51 @@ class IMU3DVisualizer(Widget):
         cy = self.center_y
         scale = min(self.width, self.height) / 2.5
         
-        # Define box vertices (matching OpenGL version)
-        vertices = [
-            ( 1.0,  0.2, -1.0), (-1.0,  0.2, -1.0), (-1.0,  0.2,  1.0), ( 1.0,  0.2,  1.0),
-            ( 1.0, -0.2,  1.0), (-1.0, -0.2,  1.0), (-1.0, -0.2, -1.0), ( 1.0, -0.2, -1.0),
-            ( 1.0,  0.2,  1.0), (-1.0,  0.2,  1.0), (-1.0, -0.2,  1.0), ( 1.0, -0.2,  1.0),
-            ( 1.0, -0.2, -1.0), (-1.0, -0.2, -1.0), (-1.0,  0.2, -1.0), ( 1.0,  0.2, -1.0),
-            (-1.0,  0.2,  1.0), (-1.0,  0.2, -1.0), (-1.0, -0.2, -1.0), (-1.0, -0.2,  1.0),
-            ( 1.0,  0.2, -1.0), ( 1.0,  0.2,  1.0), ( 1.0, -0.2,  1.0), ( 1.0, -0.2, -1.0),
-        ]
+        # Process each face
+        visible_faces = []
         
-        colors = [
-            (0.0, 1.0, 0.0),  # Top - green
-            (1.0, 0.5, 0.0),  # Bottom - orange
-            (1.0, 0.0, 0.0),  # Front - red
-            (1.0, 1.0, 0.0),  # Back - yellow
-            (0.0, 0.0, 1.0),  # Left - blue
-            (1.0, 0.0, 1.0),  # Right - magenta
-        ]
+        for face_idx, face in enumerate(self.faces):
+            # Rotate all vertices
+            rotated = [self._rotate_point_quat(v[0], v[1], v[2]) for v in face]
+            
+            # Compute normal of rotated face
+            nx, ny, nz = self._compute_normal(rotated[0], rotated[1], rotated[2])
+            
+            # Backface culling: only draw if face is visible from camera
+            if nz >= 0:
+                continue
+            
+            # Project to 2D
+            projected = [self._project_3d_to_2d(r[0], r[1], r[2], scale, cx, cy) for r in rotated]
+            
+            # Calculate depth for sorting (average Z)
+            avg_z = sum(r[2] for r in rotated) / 4
+            
+            visible_faces.append((avg_z, face_idx, projected))
         
-        projected_faces = []
-        for face_idx in range(6):
-            face_vertices = []
-            for vert_idx in range(4):
-                v = vertices[face_idx * 4 + vert_idx]
-                rx, ry, rz = self._rotate_point_quat(v[0], v[1], v[2])
-                px, py, pz = self._project_3d_to_2d(rx, ry, rz, scale, cx, cy)
-                face_vertices.append((px, py, pz))
-            avg_z = sum(v[2] for v in face_vertices) / 4
-            projected_faces.append((avg_z, face_idx, face_vertices))
+        # Sort by depth (furthest first for painter's algorithm)
+        visible_faces.sort(key=lambda f: f[0])
         
-        projected_faces.sort(key=lambda f: f[0])
-        
+        # Draw faces
         with self.canvas:
-            for avg_z, face_idx, face_verts in projected_faces:
-                color = colors[face_idx]
+            # Black background
+            Color(0, 0, 0, 1)
+            from kivy.graphics import Rectangle
+            Rectangle(pos=self.pos, size=self.size)
+            
+            # Draw each visible face
+            for avg_z, face_idx, verts in visible_faces:
+                color = self.colors[face_idx]
                 Color(color[0], color[1], color[2], 1.0)
-                Quad(points=[
-                    face_verts[0][0], face_verts[0][1],
-                    face_verts[1][0], face_verts[1][1],
-                    face_verts[2][0], face_verts[2][1],
-                    face_verts[3][0], face_verts[3][1],
-                ])
+                
+                # Use Mesh with triangle fan mode for quad
+                vertices = []
+                for v in verts:
+                    vertices.extend([v[0], v[1], 0, 0])  # x, y, u, v
+                
+                indices = [0, 1, 2, 0, 2, 3]  # Two triangles for quad
+                
+                Mesh(vertices=vertices, indices=indices, mode='triangles')
 
 
 class TCPWidget(BoxLayout):
@@ -181,11 +232,12 @@ class TCPWidget(BoxLayout):
             self.yaw = float(parts[19])
             
             # Update UI on main thread
-            Clock.schedule_once(lambda dt: self.visualizer.set_quaternion(w, x, y, z), 0)
+            Clock.schedule_once(lambda dt, w=w, x=x, y=y, z=z: 
+                                self.visualizer.set_quaternion(w, x, y, z), 0)
             Clock.schedule_once(lambda dt: self.update_orientation_display(), 0)
             
             return True
-        except:
+        except (ValueError, IndexError):
             return False
 
     def tcp_receiver_thread(self):
@@ -206,7 +258,7 @@ class TCPWidget(BoxLayout):
                     data = self.sock.recv(1024).decode(errors='ignore')
                 except socket.timeout:
                     continue
-                except:
+                except socket.error:
                     break
                 
                 if not data:
@@ -214,6 +266,7 @@ class TCPWidget(BoxLayout):
                 
                 buf += data
                 
+                # Process complete lines using partition
                 while "\n" in buf:
                     line, _, buf = buf.partition("\n")
                     self.parse_imu_line(line)
