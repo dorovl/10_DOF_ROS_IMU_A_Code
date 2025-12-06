@@ -1,3 +1,6 @@
+import sys
+import socket
+import threading
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -5,11 +8,9 @@ from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
 from kivy.graphics import Color, Quad
-import socket
-import threading
 
 # TCP connection settings
-TCP_HOST = "192.168.0.102"  # ESP32 IP address - adjust as needed
+TCP_HOST = "192.168.0.105"  # ESP32 IP address - adjust as needed
 TCP_PORT = 25
 
 
@@ -107,9 +108,12 @@ class IMU3DVisualizer(Widget):
 
 
 class TCPWidget(BoxLayout):
-    def __init__(self, **kwargs):
+    def __init__(self, host, port, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'
+        
+        self.tcp_host = host
+        self.tcp_port = port
         
         self.roll = 0.0
         self.pitch = 0.0
@@ -120,7 +124,7 @@ class TCPWidget(BoxLayout):
         
         # Status label
         self.status_label = Label(
-            text=f"Press 'Connect' to start ({TCP_HOST}:{TCP_PORT})",
+            text=f"Press 'Connect' to start ({self.tcp_host}:{self.tcp_port})",
             size_hint=(1, 0.1),
             color=(1, 1, 1, 1)
         )
@@ -191,7 +195,7 @@ class TCPWidget(BoxLayout):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.settimeout(5.0)
-            self.sock.connect((TCP_HOST, TCP_PORT))
+            self.sock.connect((self.tcp_host, self.tcp_port))
             self.sock.settimeout(0.5)
             
             self.update_status("Connected! Streaming data...")
@@ -221,7 +225,7 @@ class TCPWidget(BoxLayout):
                 self.sock.close()
                 self.sock = None
             self.running = False
-            self.update_status(f"Disconnected ({TCP_HOST}:{TCP_PORT})")
+            self.update_status(f"Disconnected ({self.tcp_host}:{self.tcp_port})")
             Clock.schedule_once(lambda dt: setattr(self.connect_button, 'text', 'Connect'), 0)
             Clock.schedule_once(lambda dt: setattr(self.connect_button, 'disabled', False), 0)
 
@@ -234,16 +238,37 @@ class TCPWidget(BoxLayout):
             # Connect
             self.running = True
             self.connect_button.text = "Connecting..."
-            self.update_status(f"Connecting to {TCP_HOST}:{TCP_PORT}...")
+            self.update_status(f"Connecting to {self.tcp_host}:{self.tcp_port}...")
             
             thread = threading.Thread(target=self.tcp_receiver_thread, daemon=True)
             thread.start()
 
 
 class IMUTCPApp(App):
+    def __init__(self, host, port, **kwargs):
+        super().__init__(**kwargs)
+        self.host = host
+        self.port = port
+    
     def build(self):
-        return TCPWidget()
+        self.title = "IMU Visualization (TCP) - Kivy"
+        return TCPWidget(self.host, self.port)
 
 
 if __name__ == "__main__":
-    IMUTCPApp().run()
+    # Allow command line override of host
+    host = TCP_HOST
+    port = TCP_PORT
+    
+    if len(sys.argv) > 1:
+        host = sys.argv[1]
+    if len(sys.argv) > 2:
+        try:
+            port = int(sys.argv[2])
+        except ValueError:
+            pass
+    
+    print(f"IMU Visualization - Target: {host}:{port}")
+    print("Press 'Connect' button to start streaming\n")
+    
+    IMUTCPApp(host, port).run()
